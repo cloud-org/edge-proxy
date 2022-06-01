@@ -1,26 +1,28 @@
 package proxy
 
 import (
+	"fmt"
 	"net/http"
 
 	"code.aliyun.com/openyurt/edge-proxy/cmd/edge-proxy/app/config"
 )
 
-// NewEdgeReverseProxyHandler creates a http handler for proxying all of incoming requests.
-func NewEdgeReverseProxyHandler(cfg *config.EdgeProxyConfiguration, rt http.RoundTripper, stopCh <-chan struct{}) (http.Handler, error) {
-	// simple example: use httputil.ReverseProxy to proxy requests.
-
-	//reverseProxy := httputil.NewSingleHostReverseProxy(cfg.RemoteServers[0])
-	//reverseProxy.Transport = rt
-	//reverseProxy.FlushInterval = -1
-	//reverseProxy.ErrorHandler = errorHandler
-	//
-	//return reverseProxy, nil
-
-	return nil, nil
+type HandlerFactory interface {
+	Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan struct{}) (http.Handler, error)
 }
 
-//func errorHandler(rw http.ResponseWriter, req *http.Request, err error) {
-//	klog.Errorf("remote proxy error handler: %s, %v", req.URL.String(), err)
-//	rw.WriteHeader(http.StatusBadGateway)
-//}
+var (
+	proxyHandlerFactories = []HandlerFactory{}
+)
+
+func Register(factory HandlerFactory) {
+	proxyHandlerFactories = append(proxyHandlerFactories, factory)
+}
+
+func GetProxyHandler(cfg *config.EdgeProxyConfiguration, stopCh <-chan struct{}) (http.Handler, error) {
+	if len(proxyHandlerFactories) != 1 {
+		return nil, fmt.Errorf("no handler factory is prepared")
+	}
+
+	return proxyHandlerFactories[0].Init(cfg, stopCh)
+}

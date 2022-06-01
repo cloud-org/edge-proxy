@@ -3,9 +3,11 @@ package config
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"strings"
 
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
 	"code.aliyun.com/openyurt/edge-proxy/cmd/edge-proxy/app/options"
@@ -15,12 +17,12 @@ import (
 
 // EdgeProxyConfiguration represents configuration of edge proxy
 type EdgeProxyConfiguration struct {
+	SerializerManager   *serializer.SerializerManager
+	RT                  http.RoundTripper
 	RemoteServers       []*url.URL
+	DishCachePath       string
 	BindAddr            string
 	EdgeProxyServerAddr string
-	NodeName            string
-	JoinToken           string
-	SerializerManager   *serializer.SerializerManager
 }
 
 // Complete converts *options.EdgeProxyOptions to *EdgeProxyConfiguration
@@ -31,14 +33,18 @@ func Complete(options *options.EdgeProxyOptions) (*EdgeProxyConfiguration, error
 	}
 
 	serializerManager := serializer.NewSerializerManager()
+	rt, err := prepareRoundTripper()
+	if err != nil {
+		return nil, fmt.Errorf("could not new round tripper, %w", err)
+	}
 
 	cfg := &EdgeProxyConfiguration{
 		RemoteServers:       us,
 		BindAddr:            net.JoinHostPort("127.0.0.1", "10367"),
 		EdgeProxyServerAddr: net.JoinHostPort("127.0.0.1", "10361"),
-		NodeName:            options.NodeName,
-		JoinToken:           options.JoinToken,
+		DishCachePath:       options.DiskCachePath,
 		SerializerManager:   serializerManager,
+		RT:                  rt,
 	}
 
 	return cfg, nil
@@ -72,4 +78,13 @@ func parseRemoteServers(serverAddr string) ([]*url.URL, error) {
 	klog.Infof("%s would connect remote servers: %s", projectinfo.GetProxyName(), strings.Join(remoteServers, ","))
 
 	return us, nil
+}
+
+func prepareRoundTripper() (http.RoundTripper, error) {
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	return rest.TransportFor(cfg)
 }

@@ -2,11 +2,8 @@ package app
 
 import (
 	"fmt"
-	"net/http"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
 	"code.aliyun.com/openyurt/edge-proxy/cmd/edge-proxy/app/config"
@@ -54,18 +51,11 @@ func NewCmdStartEdgeProxy(stopCh <-chan struct{}) *cobra.Command {
 	return cmd
 }
 
-// Run runs the YurtHubConfiguration. This should never exit
+// Run runs the EdgeProxyConfiguration. This should never exit
 func Run(cfg *config.EdgeProxyConfiguration, stopCh <-chan struct{}) error {
 	trace := 1
-	klog.Infof("%d. new http round tripper", trace)
-	rt, err := prepareRoundTripper()
-	if err != nil {
-		return fmt.Errorf("could not new round tripper, %w", err)
-	}
-	trace++
-
 	klog.Infof("%d. new reverse proxy handler for remote servers", trace)
-	yurtProxyHandler, err := proxy.NewEdgeReverseProxyHandler(cfg, rt, stopCh)
+	yurtProxyHandler, err := proxy.GetProxyHandler(cfg, stopCh)
 	if err != nil {
 		return fmt.Errorf("could not create reverse proxy handler, %w", err)
 	}
@@ -77,15 +67,6 @@ func Run(cfg *config.EdgeProxyConfiguration, stopCh <-chan struct{}) error {
 		return fmt.Errorf("could not create hub server, %w", err)
 	}
 	s.Run()
-	klog.Infof("hub agent exited")
+	klog.Infof("edge proxy exited")
 	return nil
-}
-
-func prepareRoundTripper() (http.RoundTripper, error) {
-	cfg, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	return rest.TransportFor(cfg)
 }
