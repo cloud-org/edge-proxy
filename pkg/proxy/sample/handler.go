@@ -1,15 +1,17 @@
 package sample
 
 import (
-	"code.aliyun.com/openyurt/edge-proxy/cmd/edge-proxy/app/config"
-	"code.aliyun.com/openyurt/edge-proxy/pkg/proxy"
-	"k8s.io/klog/v2"
 	"net/http"
 	"net/http/httputil"
+
+	"k8s.io/klog/v2"
+
+	"code.aliyun.com/openyurt/edge-proxy/cmd/edge-proxy/app/config"
+	"code.aliyun.com/openyurt/edge-proxy/pkg/proxy"
 )
 
 func init() {
-	proxy.Register(&sampleFactory{})
+	proxy.Register("sample", &sampleFactory{})
 }
 
 type sampleFactory struct{}

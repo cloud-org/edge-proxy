@@ -23,6 +23,7 @@ type EdgeProxyConfiguration struct {
 	DishCachePath       string
 	BindAddr            string
 	EdgeProxyServerAddr string
+	EnableSampleHandler bool
 }
 
 // Complete converts *options.EdgeProxyOptions to *EdgeProxyConfiguration
@@ -45,6 +46,7 @@ func Complete(options *options.EdgeProxyOptions) (*EdgeProxyConfiguration, error
 		DishCachePath:       options.DiskCachePath,
 		SerializerManager:   serializerManager,
 		RT:                  rt,
+		EnableSampleHandler: options.EnableSampleHandler,
 	}
 
 	return cfg, nil
@@ -52,7 +54,7 @@ func Complete(options *options.EdgeProxyOptions) (*EdgeProxyConfiguration, error
 
 func parseRemoteServers(serverAddr string) ([]*url.URL, error) {
 	if serverAddr == "" {
-		return make([]*url.URL, 0), fmt.Errorf("--server-addr should be set for hub agent")
+		return make([]*url.URL, 0), fmt.Errorf("--server-addr should be set for edge proxy")
 	}
 	servers := strings.Split(serverAddr, ",")
 	us := make([]*url.URL, 0, len(servers))

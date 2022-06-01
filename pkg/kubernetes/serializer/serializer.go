@@ -1,19 +1,3 @@
-/*
-Copyright 2020 The OpenYurt Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package serializer
 
 import (
@@ -39,19 +23,16 @@ import (
 	"k8s.io/klog/v2"
 )
 
-type yurtClientNegotiator struct {
-	recognized bool
-	runtime.ClientNegotiator
-}
-
 var (
 	// unsafeSchemeRESTMapper is used to store the mapping relationship between GVK and GVR in scheme
 	// It is not updatable and is only used for the judgment of scheme resources
 	unsafeSchemeRESTMapper = NewDefaultRESTMapperFromScheme()
-
-	// YurtHubSerializer is a global serializer manager for yurthub
-	YurtHubSerializer = NewSerializerManager()
 )
+
+type yurtClientNegotiator struct {
+	recognized bool
+	runtime.ClientNegotiator
+}
 
 // SerializerManager is responsible for managing *rest.Serializers
 type SerializerManager struct {
@@ -206,7 +187,7 @@ func (sm *SerializerManager) genClientNegotiator(gvr schema.GroupVersionResource
 	return runtime.NewClientNegotiator(sm.UnstructuredNegotiatedSerializer, gvr.GroupVersion()), false
 }
 
-// Serializer is used for transforming objects into a serialized format and back for cache manager of hub agent.
+// Serializer is used for transforming objects into a serialized format
 type Serializer struct {
 	recognized  bool
 	contentType string

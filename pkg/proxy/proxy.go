@@ -2,27 +2,34 @@ package proxy
 
 import (
 	"fmt"
+	"k8s.io/klog/v2"
 	"net/http"
 
 	"code.aliyun.com/openyurt/edge-proxy/cmd/edge-proxy/app/config"
 )
 
-type HandlerFactory interface {
-	Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan struct{}) (http.Handler, error)
-}
-
 var (
-	proxyHandlerFactories = []HandlerFactory{}
+	proxyHandlerFactories = map[string]HandlerFactory{}
 )
 
-func Register(factory HandlerFactory) {
-	proxyHandlerFactories = append(proxyHandlerFactories, factory)
+func Register(name string, factory HandlerFactory) {
+	if _, ok := proxyHandlerFactories[name]; ok {
+		klog.Infof("proxy handler %s already has been registered, name")
+		return
+	}
+
+	proxyHandlerFactories[name] = factory
 }
 
 func GetProxyHandler(cfg *config.EdgeProxyConfiguration, stopCh <-chan struct{}) (http.Handler, error) {
-	if len(proxyHandlerFactories) != 1 {
-		return nil, fmt.Errorf("no handler factory is prepared")
+	if !cfg.EnableSampleHandler {
+		delete(proxyHandlerFactories, "sample")
 	}
 
-	return proxyHandlerFactories[0].Init(cfg, stopCh)
+	for name, factory := range proxyHandlerFactories {
+		klog.Infof("get a proxy handler from %s", name)
+		return factory.Init(cfg, stopCh)
+	}
+
+	return nil, fmt.Errorf("no proxy handler is prepared")
 }
