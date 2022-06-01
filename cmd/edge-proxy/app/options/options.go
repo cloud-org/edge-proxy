@@ -9,8 +9,6 @@ import (
 // EdgeProxyOptions is the main settings for the edge-proxy
 type EdgeProxyOptions struct {
 	ServerAddr          string
-	NodeName            string
-	JoinToken           string
 	DiskCachePath       string
 	Version             bool
 	EnableSampleHandler bool

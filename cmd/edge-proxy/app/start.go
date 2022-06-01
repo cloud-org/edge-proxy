@@ -55,14 +55,14 @@ func NewCmdStartEdgeProxy(stopCh <-chan struct{}) *cobra.Command {
 func Run(cfg *config.EdgeProxyConfiguration, stopCh <-chan struct{}) error {
 	trace := 1
 	klog.Infof("%d. new reverse proxy handler for remote servers", trace)
-	yurtProxyHandler, err := proxy.GetProxyHandler(cfg, stopCh)
+	edgeProxyHandler, err := proxy.GetProxyHandler(cfg, stopCh)
 	if err != nil {
 		return fmt.Errorf("could not create reverse proxy handler, %w", err)
 	}
 	trace++
 
 	klog.Infof("%d. new %s server and begin to serve, proxy server: %s, stub server: %s", trace, projectinfo.GetProxyName(), cfg.EdgeProxyServerAddr, cfg.BindAddr)
-	s, err := server.NewEdgeProxyServer(cfg, yurtProxyHandler)
+	s, err := server.NewEdgeProxyServer(cfg, edgeProxyHandler)
 	if err != nil {
 		return fmt.Errorf("could not create hub server, %w", err)
 	}

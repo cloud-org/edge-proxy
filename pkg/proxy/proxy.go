@@ -22,8 +22,8 @@ func Register(name string, factory HandlerFactory) {
 }
 
 func GetProxyHandler(cfg *config.EdgeProxyConfiguration, stopCh <-chan struct{}) (http.Handler, error) {
-	if !cfg.EnableSampleHandler {
-		delete(proxyHandlerFactories, "sample")
+	if cfg.EnableSampleHandler {
+		return proxyHandlerFactories["sample"].Init(cfg, stopCh)
 	}
 
 	for name, factory := range proxyHandlerFactories {

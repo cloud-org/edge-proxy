@@ -41,8 +41,8 @@ func Complete(options *options.EdgeProxyOptions) (*EdgeProxyConfiguration, error
 
 	cfg := &EdgeProxyConfiguration{
 		RemoteServers:       us,
-		BindAddr:            net.JoinHostPort("127.0.0.1", "10367"),
-		EdgeProxyServerAddr: net.JoinHostPort("127.0.0.1", "10361"),
+		BindAddr:            net.JoinHostPort("127.0.0.1", "10267"),
+		EdgeProxyServerAddr: net.JoinHostPort("127.0.0.1", "10261"),
 		DishCachePath:       options.DiskCachePath,
 		SerializerManager:   serializerManager,
 		RT:                  rt,
