@@ -29,4 +29,4 @@ clean:
 	-rm -Rf _output
 
 docker-build:
-	docker buildx build --no-cache --load ${DOCKER_BUILD_ARGS} --platform ${TARGET_PLATFORMS} -f hack/dockerfiles/Dockerfile . -t ${IMAGE_REPO}/edge-proxy:${GIT_VERSION}
+	docker buildx build --no-cache --push ${DOCKER_BUILD_ARGS} --platform ${TARGET_PLATFORMS} -f hack/dockerfiles/Dockerfile . -t ${IMAGE_REPO}/edge-proxy:${GIT_VERSION}
