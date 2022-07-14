@@ -41,6 +41,8 @@ DOCKER_PASSWD="$3"
 
 function create_manifest() {
 
+    mkdir -p ${YURT_OUTPUT_DIR}
+
     local output_file=${YURT_OUTPUT_DIR}/manifest.yaml
 	
     local imageSecretName="benchmark"
