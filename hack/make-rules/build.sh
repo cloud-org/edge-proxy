@@ -50,10 +50,14 @@ build_binaries() {
     rm -rf ${target_bin_dir}
     mkdir -p ${target_bin_dir}
     cd ${target_bin_dir}
-      echo "Building ${binary}"
-      go build -o edge-proxy \
+    echo "Building ${binary}"
+   	go build -o edge-proxy \
           -ldflags "${goldflags:-}" \
           -gcflags "${gcflags:-}" ${goflags} $YURT_ROOT/cmd/edge-proxy
+   	go build -o benchmark \
+          -ldflags "${goldflags:-}" \
+          -gcflags "${gcflags:-}" ${goflags} $YURT_ROOT/cmd/benchmark
+
 }
 
 build_binaries

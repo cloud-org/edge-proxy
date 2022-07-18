@@ -26,7 +26,7 @@ type EdgeProxyConfiguration struct {
 	EnableSampleHandler bool
 }
 
-// Complete converts *options.EdgeProxyOptions to *EdgeProxyConfiguration
+// Complete converts *options.BenchMarkOptions to *EdgeProxyConfiguration
 func Complete(options *options.EdgeProxyOptions) (*EdgeProxyConfiguration, error) {
 	us, err := parseRemoteServers(options.ServerAddr)
 	if err != nil {
