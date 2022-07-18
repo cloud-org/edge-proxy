@@ -32,33 +32,32 @@ import (
 )
 
 type Filter struct {
-	ProxyClient           kubernetes.Interface
-	Client                kubernetes.Interface
-	PrepareConfigmaps     map[string]*v1.ConfigMap
-	PrepareSkipConfigmaps map[string]*v1.ConfigMap
-	Labels                map[string]string
-	NameSpace             string
-	Nums                  int
+	ProxyClient             kubernetes.Interface
+	Client                  kubernetes.Interface
+	PrepareConfigmaps       map[string]*v1.ConfigMap
+	PrepareSkipConfigmaps   map[string]*v1.ConfigMap
+	PrepareNoSkipConfigmaps map[string]*v1.ConfigMap
+	Labels                  map[string]string
+	NameSpace               string
+	Nums                    int
 }
 
-func NewFilter(proxyClient, client kubernetes.Interface) *Filter {
+func NewFilter(ns string, proxyClient, client kubernetes.Interface) *Filter {
 	return &Filter{
-		ProxyClient:           proxyClient,
-		Client:                client,
-		NameSpace:             "filter",
-		Nums:                  100,
-		PrepareConfigmaps:     make(map[string]*v1.ConfigMap),
-		PrepareSkipConfigmaps: make(map[string]*v1.ConfigMap),
+		ProxyClient:             proxyClient,
+		Client:                  client,
+		NameSpace:               ns,
+		Nums:                    100,
+		PrepareConfigmaps:       make(map[string]*v1.ConfigMap),
+		PrepareSkipConfigmaps:   make(map[string]*v1.ConfigMap),
+		PrepareNoSkipConfigmaps: make(map[string]*v1.ConfigMap),
 		Labels: map[string]string{
-			"type": "filter",
+			"type":                    "filter",
+			util.BENCH_MARK_LABEL_KEY: util.BENCH_MARK_LABEL_VALUE,
 		},
 	}
 }
 func (f *Filter) Prepare(ctx context.Context) error {
-	if err := util.ReCreateNamespace(ctx, f.Client, f.NameSpace); err != nil {
-		klog.Errorf("Recreate namespace %s error %v", f.NameSpace, err)
-		return err
-	}
 	var name string
 	for i := 0; i < f.Nums; i++ {
 		if i%2 == 1 {
@@ -89,8 +88,9 @@ func (f *Filter) Prepare(ctx context.Context) error {
 		if i%2 == 1 {
 			f.PrepareSkipConfigmaps[key] = c
 		} else {
-			f.PrepareConfigmaps[key] = c
+			f.PrepareNoSkipConfigmaps[key] = c
 		}
+		f.PrepareConfigmaps[key] = c
 	}
 	return nil
 }
@@ -104,8 +104,8 @@ func (f *Filter) benchmark_list_configmaps(ctx context.Context) error {
 		return err
 	}
 
-	if len(cms.Items) != len(f.PrepareConfigmaps) {
-		klog.Errorf("Get wrong configmap nums, get nums %d prepare num %d", len(cms.Items), len(f.PrepareConfigmaps))
+	if len(cms.Items) != len(f.PrepareNoSkipConfigmaps) {
+		klog.Errorf("Get wrong configmap nums, get nums %d prepare num %d", len(cms.Items), len(f.PrepareNoSkipConfigmaps))
 		return fmt.Errorf("get wrong configmap nums")
 	}
 
@@ -124,7 +124,13 @@ func (f *Filter) BenchMark(ctx context.Context) error {
 }
 
 func (f *Filter) Clean(ctx context.Context) error {
-	return f.Client.CoreV1().Namespaces().Delete(ctx, f.NameSpace, metav1.DeleteOptions{})
+	for _, cm := range f.PrepareConfigmaps {
+		if err := f.Client.CoreV1().ConfigMaps(f.NameSpace).Delete(ctx, cm.GetName(), metav1.DeleteOptions{}); err != nil {
+			klog.Errorf("Delete cm %s error %v", klog.KObj(cm), err)
+			return err
+		}
+	}
+	return nil
 }
 
 func (f *Filter) Name() string {

@@ -41,24 +41,21 @@ type Consistency struct {
 	Nums              int
 }
 
-func NewConsistency(proxyClient, client kubernetes.Interface) *Consistency {
+func NewConsistency(ns string, proxyClient, client kubernetes.Interface) *Consistency {
 	return &Consistency{
 		ProxyClient: proxyClient,
 		Client:      client,
-		NameSpace:   "consistency",
+		NameSpace:   ns,
 		Nums:        100,
 		Labels: map[string]string{
-			"type": "consistency",
+			"type":                    "consistency",
+			util.BENCH_MARK_LABEL_KEY: util.BENCH_MARK_LABEL_VALUE,
 		},
 		PrepareConfigmaps: make(map[string]*v1.ConfigMap),
 	}
 }
 
 func (c *Consistency) Prepare(ctx context.Context) error {
-	if err := util.ReCreateNamespace(ctx, c.Client, c.NameSpace); err != nil {
-		klog.Errorf("Recreate namespace %s error %v", c.NameSpace, err)
-		return err
-	}
 
 	for i := 0; i < c.Nums; i++ {
 
@@ -145,7 +142,13 @@ func (r *Consistency) benchmark_configmap(ctx context.Context) error {
 }
 
 func (c *Consistency) Clean(ctx context.Context) error {
-	return c.Client.CoreV1().Namespaces().Delete(ctx, c.NameSpace, metav1.DeleteOptions{})
+	for _, cm := range c.PrepareConfigmaps {
+		if err := c.Client.CoreV1().ConfigMaps(c.NameSpace).Delete(ctx, cm.GetName(), metav1.DeleteOptions{}); err != nil {
+			klog.Errorf("Delete cm %s error %v", klog.KObj(cm), err)
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *Consistency) Name() string {

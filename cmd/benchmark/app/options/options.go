@@ -8,7 +8,8 @@ import (
 
 // BenchMarkOptions is the main settings for the edge-proxy
 type BenchMarkOptions struct {
-	TimeOut int // second
+	TimeOut   int // second
+	Namespace string
 }
 
 // NewBenchmarkOptions creates a new BenchMarkOptions with a default config.
@@ -31,4 +32,5 @@ func (o *BenchMarkOptions) Validate() error {
 // AddFlags returns flags for a specific edge proxy by section name
 func (o *BenchMarkOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&o.TimeOut, "timeout", o.TimeOut, "bench mark timeout (second)")
+	fs.StringVar(&o.Namespace, "namespace", o.Namespace, "bench mark namespace")
 }

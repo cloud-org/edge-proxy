@@ -46,26 +46,23 @@ type Functional struct {
 	Nums                 int
 }
 
-func NewFunctional(proxyClient, client kubernetes.Interface, proxylister, lister clientgov1.ConfigMapLister) *Functional {
+func NewFunctional(ns string, proxyClient, client kubernetes.Interface, proxylister, lister clientgov1.ConfigMapLister) *Functional {
 	return &Functional{
 		ProxyClient:          proxyClient,
 		Client:               client,
-		NameSpace:            "functional",
+		NameSpace:            ns,
 		Nums:                 100,
 		ProxyConfigMapLister: proxylister,
 		ConfigMapLister:      lister,
 		PrepareConfigmaps:    make(map[string]*v1.ConfigMap),
 		Labels: map[string]string{
-			"type": "functional",
+			"type":                    "functional",
+			util.BENCH_MARK_LABEL_KEY: util.BENCH_MARK_LABEL_VALUE,
 		},
 	}
 }
 
 func (f *Functional) Prepare(ctx context.Context) error {
-	if err := util.ReCreateNamespace(ctx, f.Client, f.NameSpace); err != nil {
-		klog.Errorf("Recreate namespace %s error %v", f.NameSpace, err)
-		return err
-	}
 	var name string
 	for i := 0; i < f.Nums; i++ {
 		name = fmt.Sprintf("%s-functional-%d", util.BENCH_MARK_PREFIX, i)
@@ -205,7 +202,13 @@ func (f *Functional) BenchMark(ctx context.Context) error {
 }
 
 func (f *Functional) Clean(ctx context.Context) error {
-	return f.Client.CoreV1().Namespaces().Delete(ctx, f.NameSpace, metav1.DeleteOptions{})
+	for _, cm := range f.PrepareConfigmaps {
+		if err := f.Client.CoreV1().ConfigMaps(f.NameSpace).Delete(ctx, cm.GetName(), metav1.DeleteOptions{}); err != nil {
+			klog.Errorf("Delete cm %s error %v", klog.KObj(cm), err)
+			return err
+		}
+	}
+	return nil
 }
 
 func (f *Functional) Name() string {

@@ -118,9 +118,5 @@ func Run(ctx context.Context, markOptions *options.BenchMarkOptions) error {
 		klog.Fatalf("NewBenchMark error %v", err)
 	}
 
-	b.Run(ctx)
-
-	for {
-		time.Sleep(time.Second)
-	}
+	return b.Run(ctx)
 }
