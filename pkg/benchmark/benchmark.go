@@ -19,6 +19,10 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -40,6 +44,7 @@ type BenchMark struct {
 	ProxyConfigMapLister v1.ConfigMapLister
 	ConfigMapLister      v1.ConfigMapLister
 	SubBenchMarkers      []BenchMarker
+	Namespace            string
 }
 
 func NewBenchMark(deps *options.BenchMarkOptions) (*BenchMark, error) {
@@ -110,9 +115,13 @@ func NewBenchMark(deps *options.BenchMarkOptions) (*BenchMark, error) {
 		ProxyConfigMapLister: proxyInformerCMs.Lister(),
 		ConfigMapLister:      informerCMs.Lister(),
 		SubBenchMarkers:      make([]BenchMarker, 0, 4),
+		Namespace:            deps.Namespace,
 	}
 
-	b.SubBenchMarkers = append(b.SubBenchMarkers, NewFunctional(proxycs, cs, b.ProxyConfigMapLister, b.ConfigMapLister), NewFilter(proxycs, cs), NewConsistency(proxycs, cs))
+	b.SubBenchMarkers = append(b.SubBenchMarkers,
+		NewFunctional(b.Namespace, proxycs, cs, b.ProxyConfigMapLister, b.ConfigMapLister),
+		NewFilter(b.Namespace, proxycs, cs),
+		NewConsistency(b.Namespace, proxycs, cs))
 	return b, nil
 }
 
@@ -132,7 +141,6 @@ func (m *BenchMark) Run(ctx context.Context) error {
 		}
 		if err := b.BenchMark(ctx); err != nil {
 			klog.Errorf("%s error %v", b, err)
-			klog.Errorf("======== %s failure ========", b)
 			b.Clean(ctx)
 			continue
 		}
@@ -141,13 +149,31 @@ func (m *BenchMark) Run(ctx context.Context) error {
 			klog.Errorf("%s clean error %v", b, err)
 			return err
 		}
-		klog.Infof("-------- %s successfully --------", b)
+		klog.Infof("%s successfully ...", b)
 	}
 
+	klog.Infof("-------- All benchmark exec end --------")
 	return nil
 }
 
 func (m *BenchMark) Prepare(ctx context.Context) error {
+	labelResource := labels.SelectorFromSet(map[string]string{
+		util.BENCH_MARK_LABEL_KEY: util.BENCH_MARK_LABEL_VALUE})
 
+	listOptions := metav1.ListOptions{
+		LabelSelector: labelResource.String(),
+	}
+	if err := m.Client.CoreV1().ConfigMaps(m.Namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, listOptions); err != nil {
+		if !errors.IsNotFound(err) {
+			klog.Errorf("Clean configmaps error: %v", err)
+			return err
+		}
+	}
+	if err := m.Client.CoreV1().Pods(m.Namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, listOptions); err != nil {
+		if !errors.IsNotFound(err) {
+			klog.Errorf("Clean pods error: %v", err)
+			return err
+		}
+	}
 	return nil
 }

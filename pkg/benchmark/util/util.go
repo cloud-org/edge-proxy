@@ -17,3 +17,5 @@ package util
 
 const BENCH_MARK_PREFIX = "benchmark"
 const SKIPNAME_PREFIX = "skip-"
+const BENCH_MARK_LABEL_KEY = "cloud-native-challenge"
+const BENCH_MARK_LABEL_VALUE = "benchmark"
