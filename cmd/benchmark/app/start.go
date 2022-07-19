@@ -61,7 +61,7 @@ func NewCmdBenchMark(stopCh <-chan struct{}) *cobra.Command {
 			klog.Infof("Version:%#v", projectinfo.Get())
 
 			// validate the initial fetch-task flags
-			if err := benchMarkOptions.Validate(); err != nil {
+			if err = benchMarkOptions.Validate(); err != nil {
 				klog.Fatal(err)
 			}
 
@@ -111,6 +111,7 @@ func Run(ctx context.Context, markOptions *options.BenchMarkOptions) error {
 
 	// sleep until edge-proxy ready
 	klog.Infof("Sleep 1 minute to wait edge-proxy ready")
+	// todo: 可以考虑不用这么长时间
 	time.Sleep(time.Minute)
 
 	b, err := benchmark.NewBenchMark(markOptions)

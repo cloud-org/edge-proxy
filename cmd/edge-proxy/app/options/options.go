@@ -8,8 +8,8 @@ import (
 
 // EdgeProxyOptions is the main settings for the edge-proxy
 type EdgeProxyOptions struct {
-	ServerAddr          string
-	DiskCachePath       string
+	ServerAddr          string // kube api-server addr
+	DiskCachePath       string // 磁盘缓存路径
 	Version             bool
 	EnableSampleHandler bool
 }

@@ -28,12 +28,15 @@ type EdgeProxyConfiguration struct {
 
 // Complete converts *options.BenchMarkOptions to *EdgeProxyConfiguration
 func Complete(options *options.EdgeProxyOptions) (*EdgeProxyConfiguration, error) {
+	// 解析成 []*url.URL 切片
 	us, err := parseRemoteServers(options.ServerAddr)
 	if err != nil {
 		return nil, err
 	}
 
+	// 应该序列化到磁盘的时候使用
 	serializerManager := serializer.NewSerializerManager()
+	// 获取 roundTripper 表示执行单个HTTP事务的能力，获得给定请求的响应
 	rt, err := prepareRoundTripper()
 	if err != nil {
 		return nil, fmt.Errorf("could not new round tripper, %w", err)
@@ -82,6 +85,7 @@ func parseRemoteServers(serverAddr string) ([]*url.URL, error) {
 	return us, nil
 }
 
+// todo: 传入 flag 表示是否是测试，否则只能 inClusterConfig
 func prepareRoundTripper() (http.RoundTripper, error) {
 	cfg, err := rest.InClusterConfig()
 	if err != nil {

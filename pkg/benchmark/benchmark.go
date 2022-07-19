@@ -60,16 +60,20 @@ func NewBenchMark(deps *options.BenchMarkOptions) (*BenchMark, error) {
 	}
 
 	proxyc.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(10000, 20000)
+	// edge-proxy client
 	proxycs, err := kubernetes.NewForConfig(proxyc)
 	if err != nil {
 		klog.Errorf("NewForConfig for proxy error %v", err)
 		return nil, err
 	}
 
+	// in cluster config
+	// todo: 从 kubeconfig path 读取
 	c, err := clientcmd.BuildConfigFromFlags("", "")
 	if err != nil {
 		return nil, fmt.Errorf("build config from flags error %v", err)
 	}
+
 	// set rate limit
 	c.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(10000, 20000)
 	// 实例化clientset对象
@@ -87,9 +91,7 @@ func NewBenchMark(deps *options.BenchMarkOptions) (*BenchMark, error) {
 	proxyf.Start(wait.NeverStop)
 	klog.Infof("Proxy informer started")
 
-	if !cache.WaitForCacheSync(wait.NeverStop,
-		proxyCMInformer.HasSynced,
-	) {
+	if !cache.WaitForCacheSync(wait.NeverStop, proxyCMInformer.HasSynced) {
 		klog.Exitf("Proxy informer timed out waiting for caches to sync")
 	}
 	klog.Infof("Proxy informer wait for cache synced")
@@ -102,9 +104,7 @@ func NewBenchMark(deps *options.BenchMarkOptions) (*BenchMark, error) {
 	f.Start(wait.NeverStop)
 	klog.Infof("Informer started")
 
-	if !cache.WaitForCacheSync(wait.NeverStop,
-		cmInformer.HasSynced,
-	) {
+	if !cache.WaitForCacheSync(wait.NeverStop, cmInformer.HasSynced) {
 		klog.Exitf("Informer timed out waiting for caches to sync")
 	}
 	klog.Infof("Informer wait for cache synced")

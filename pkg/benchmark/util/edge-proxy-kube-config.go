@@ -26,7 +26,7 @@ import (
 func CreateProxyKubeConfigFile(file string) error {
 	c := clientcmdapi.NewConfig()
 	cluster := clientcmdapi.NewCluster()
-	cluster.Server = "http://127.0.0.1:10261"
+	cluster.Server = "http://127.0.0.1:10261" // 这个地址是 proxy 监听的地址，会反向代理到 server
 	c.Clusters["default-cluster"] = cluster
 
 	context := clientcmdapi.NewContext()

@@ -28,6 +28,7 @@ type edgeProxyServer struct {
 func NewEdgeProxyServer(cfg *config.EdgeProxyConfiguration,
 	proxyHandler http.Handler) (Server, error) {
 	edgeMux := mux.NewRouter()
+	// 健康检查，metrics 相关
 	registerHandlers(edgeMux)
 	stubServer := &http.Server{
 		Addr:           cfg.BindAddr,
