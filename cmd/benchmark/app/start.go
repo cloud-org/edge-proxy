@@ -111,8 +111,8 @@ func Run(ctx context.Context, markOptions *options.BenchMarkOptions) error {
 
 	// sleep until edge-proxy ready
 	klog.Infof("Sleep 1 minute to wait edge-proxy ready")
-	// todo: 可以考虑不用这么长时间
-	time.Sleep(time.Minute)
+	// 暂时设置 5s
+	time.Sleep(5 * time.Second)
 
 	b, err := benchmark.NewBenchMark(markOptions)
 	if err != nil {

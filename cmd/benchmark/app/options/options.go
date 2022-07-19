@@ -8,8 +8,9 @@ import (
 
 // BenchMarkOptions is the main settings for the edge-proxy
 type BenchMarkOptions struct {
-	TimeOut   int // second
-	Namespace string
+	TimeOut       int // second
+	Namespace     string
+	UseKubeConfig bool
 }
 
 // NewBenchmarkOptions creates a new BenchMarkOptions with a default config.
@@ -33,4 +34,5 @@ func (o *BenchMarkOptions) Validate() error {
 func (o *BenchMarkOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&o.TimeOut, "timeout", o.TimeOut, "bench mark timeout (second)")
 	fs.StringVar(&o.Namespace, "namespace", o.Namespace, "bench mark namespace")
+	fs.BoolVar(&o.UseKubeConfig, "use-kubeconfig", o.UseKubeConfig, "use kubeconfig or not. 集群外测试使用")
 }

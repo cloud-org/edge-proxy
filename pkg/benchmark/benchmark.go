@@ -18,6 +18,10 @@ package benchmark
 import (
 	"context"
 	"fmt"
+	"os"
+
+	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/config"
+	"k8s.io/client-go/rest"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,6 +53,9 @@ type BenchMark struct {
 
 func NewBenchMark(deps *options.BenchMarkOptions) (*BenchMark, error) {
 	proxyConfigFile := "/edge-proxy.kubeconfig"
+	if deps.UseKubeConfig {
+		proxyConfigFile = os.Getenv("HOME") + "/.kube/edge-proxy.kubeconfig"
+	}
 	if err := util.CreateProxyKubeConfigFile(proxyConfigFile); err != nil {
 		klog.Errorf("Create edge-proxy kubeconfigfile %s error %v", proxyConfigFile, err)
 		return nil, err
@@ -68,10 +75,15 @@ func NewBenchMark(deps *options.BenchMarkOptions) (*BenchMark, error) {
 	}
 
 	// in cluster config
-	// todo: 从 kubeconfig path 读取
-	c, err := clientcmd.BuildConfigFromFlags("", "")
+	var c *rest.Config
+	if deps.UseKubeConfig {
+		c, err = config.GetRestConf()
+	} else {
+		c, err = clientcmd.BuildConfigFromFlags("", "")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("build config from flags error %v", err)
+		klog.Errorf("build config from flags error %v", err)
+		return nil, err
 	}
 
 	// set rate limit

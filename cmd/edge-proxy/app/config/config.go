@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strings"
 
+	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/config"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
@@ -37,7 +39,7 @@ func Complete(options *options.EdgeProxyOptions) (*EdgeProxyConfiguration, error
 	// 应该序列化到磁盘的时候使用
 	serializerManager := serializer.NewSerializerManager()
 	// 获取 roundTripper 表示执行单个HTTP事务的能力，获得给定请求的响应
-	rt, err := prepareRoundTripper()
+	rt, err := prepareRoundTripper(options.UseKubeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("could not new round tripper, %w", err)
 	}
@@ -85,9 +87,16 @@ func parseRemoteServers(serverAddr string) ([]*url.URL, error) {
 	return us, nil
 }
 
-// todo: 传入 flag 表示是否是测试，否则只能 inClusterConfig
-func prepareRoundTripper() (http.RoundTripper, error) {
-	cfg, err := rest.InClusterConfig()
+func prepareRoundTripper(usekubeconfig bool) (http.RoundTripper, error) {
+	var (
+		cfg *rest.Config
+		err error
+	)
+	if usekubeconfig {
+		cfg, err = config.GetRestConf()
+	} else {
+		cfg, err = rest.InClusterConfig()
+	}
 	if err != nil {
 		return nil, err
 	}
