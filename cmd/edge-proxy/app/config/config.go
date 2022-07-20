@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/imroc/req/v3"
 	"net"
 	"net/http"
 	"net/url"
@@ -101,5 +102,33 @@ func prepareRoundTripper(usekubeconfig bool) (http.RoundTripper, error) {
 		return nil, err
 	}
 
+	// inject req client
+	//tran, err := UseReqClient(cfg)
+	//if err != nil {
+	//	klog.Errorf("get transport err: %v", err)
+	//	return nil, err
+	//}
+	//cfg.Transport = tran
+	//cfg.TLSClientConfig = rest.TLSClientConfig{}
+
 	return rest.TransportFor(cfg)
+}
+
+// UseReqClient 注入第三方 req client
+func UseReqClient(cfg *rest.Config) (http.RoundTripper, error) {
+	// https://req.cool/zh/docs/examples/integrate-with-client-go/
+	reqClient := req.C()
+	//reqClient.EnableDumpAll()
+	reqClient.EnableDebugLog()
+
+	tlsConfig, err := rest.TLSConfigFor(cfg)
+	if err != nil {
+		klog.Errorf("get tlsConfig err: %v", err)
+		return nil, err
+	}
+
+	reqTransport := reqClient.GetTransport()
+	reqTransport.SetTLSClientConfig(tlsConfig)
+
+	return reqTransport, nil
 }
