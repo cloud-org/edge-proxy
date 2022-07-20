@@ -149,7 +149,8 @@ func (m *BenchMark) Run(ctx context.Context) error {
 
 		if err := b.Prepare(ctx); err != nil {
 			klog.Errorf("%s prepare error %v", b, err)
-			return err
+			//return err
+			continue
 		}
 		if err := b.BenchMark(ctx); err != nil {
 			klog.Errorf("%s error %v", b, err)

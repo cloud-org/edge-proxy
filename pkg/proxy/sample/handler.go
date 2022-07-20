@@ -20,7 +20,6 @@ func (sf *sampleFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan 
 	// simple example: use httputil.ReverseProxy to proxy requests.
 
 	// 设置反向代理，没有缓存 没有 modify response 肯定是不符合需求的
-	klog.V(1).Infof("remoteServer.0 is %+v\n", cfg.RemoteServers[0])
 	reverseProxy := httputil.NewSingleHostReverseProxy(cfg.RemoteServers[0])
 	reverseProxy.Transport = cfg.RT
 	reverseProxy.FlushInterval = -1

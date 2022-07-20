@@ -16,6 +16,14 @@ make build 命令会生成两个二进制:edge-proxy 和 benchmark, 存放在目
 * edge-proxy 是本次比赛的框架代码，选手可以根据里面的主体逻辑实现对应的功能。
 * benchmark 是提供的一个用于本地调试edge-proxy 功能的工具，选手也参照benchmark 提供的代码，对edge-proxy更详细的测试。
 
+## local test use minikube not in cluster(use kubeconfig)
+
+```
+export server_addr=$(kubectl config view --minify -o=jsonpath="{.clusters[*].cluster.server}")
+./edge-proxy --server-addr ${server_addr} --use-kubeconfig true --enable-sample-handler true
+./benchmark --namespace default --use-kubeconfig
+```
+
 ## 如何本地测试
 
 ### 申请共享测试集群的kubeconfig 文件
