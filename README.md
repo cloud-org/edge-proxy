@@ -1,3 +1,23 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [edge-proxy本地开发](#edge-proxy%E6%9C%AC%E5%9C%B0%E5%BC%80%E5%8F%91)
+  - [运行环境](#%E8%BF%90%E8%A1%8C%E7%8E%AF%E5%A2%83)
+  - [构建二进制](#%E6%9E%84%E5%BB%BA%E4%BA%8C%E8%BF%9B%E5%88%B6)
+  - [local test use minikube not in cluster(use kubeconfig)](#local-test-use-minikube-not-in-clusteruse-kubeconfig)
+  - [docker build and push](#docker-build-and-push)
+  - [如何本地测试](#%E5%A6%82%E4%BD%95%E6%9C%AC%E5%9C%B0%E6%B5%8B%E8%AF%95)
+    - [申请共享测试集群的kubeconfig 文件](#%E7%94%B3%E8%AF%B7%E5%85%B1%E4%BA%AB%E6%B5%8B%E8%AF%95%E9%9B%86%E7%BE%A4%E7%9A%84kubeconfig-%E6%96%87%E4%BB%B6)
+    - [本地安装kubectl](#%E6%9C%AC%E5%9C%B0%E5%AE%89%E8%A3%85kubectl)
+    - [构建docker镜像，生成测试用的manifest文件](#%E6%9E%84%E5%BB%BAdocker%E9%95%9C%E5%83%8F%E7%94%9F%E6%88%90%E6%B5%8B%E8%AF%95%E7%94%A8%E7%9A%84manifest%E6%96%87%E4%BB%B6)
+    - [创建manifest资源](#%E5%88%9B%E5%BB%BAmanifest%E8%B5%84%E6%BA%90)
+    - [重复测试流程](#%E9%87%8D%E5%A4%8D%E6%B5%8B%E8%AF%95%E6%B5%81%E7%A8%8B)
+    - [其他说明](#%E5%85%B6%E4%BB%96%E8%AF%B4%E6%98%8E)
+- [edge-proxy实现指南](#edge-proxy%E5%AE%9E%E7%8E%B0%E6%8C%87%E5%8D%97)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # edge-proxy本地开发
 
 ## 运行环境
@@ -18,11 +38,17 @@ make build 命令会生成两个二进制:edge-proxy 和 benchmark, 存放在目
 
 ## local test use minikube not in cluster(use kubeconfig)
 
-```
+```sh
 export server_addr=$(kubectl config view --minify -o=jsonpath="{.clusters[*].cluster.server}")
 ./edge-proxy --server-addr ${server_addr} --use-kubeconfig true --enable-sample-handler true
 ./benchmark --namespace default --use-kubeconfig
 ```
+
+## docker build and push
+
+````sh
+make docker-build IMAGE_REPO=registry.cn-shanghai.aliyuncs.com/cloud-native-edge-proxy IMAGE_TAG=v0.0.1 REGION=cn
+````
 
 ## 如何本地测试
 
