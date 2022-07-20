@@ -9,7 +9,7 @@ import (
 
 	"code.aliyun.com/openyurt/edge-proxy/cmd/edge-proxy/app"
 	_ "code.aliyun.com/openyurt/edge-proxy/pkg/proxy/dev"
-	_ "code.aliyun.com/openyurt/edge-proxy/pkg/proxy/sample"
+	//_ "code.aliyun.com/openyurt/edge-proxy/pkg/proxy/sample"
 )
 
 func main() {

@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	proxy.Register("dev", &devFactory{})
+	proxy.Register("sample", &devFactory{})
 }
 
 type devFactory struct {
