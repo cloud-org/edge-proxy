@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 
 	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/serializer"
 	yurthubutil "github.com/openyurtio/openyurt/pkg/yurthub/util"
@@ -131,9 +132,12 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 		ctx = yurthubutil.WithRespContentType(ctx, respContentType)
 		req = req.WithContext(ctx)
 
+		klog.Infof("request info is %+v\n", info)
 		// filter response data
-		klog.Infof("info is %+v\n", info)
-		if info.IsResourceRequest && info.Verb == "list" && (info.Resource == "pods" || info.Resource == "configmaps") {
+		labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
+		if info.IsResourceRequest && info.Verb == "list" &&
+			(info.Resource == "pods" || info.Resource == "configmaps") &&
+			strings.Contains(labelSelector, "type=filter") {
 			wrapBody, needUncompressed := yurthubutil.NewGZipReaderCloser(resp.Header, resp.Body, req, "filter")
 			s := CreateSerializer(req, rp.serializerManager)
 			if s == nil {
@@ -161,6 +165,9 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 		}
 
 		// todo: cache 做缓存方便后续查询
+		//if info.Verb == "create" {
+		//
+		//}
 
 	}
 
