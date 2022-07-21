@@ -59,11 +59,12 @@ function create_manifest() {
 
     local output_file=${YURT_OUTPUT_DIR}/manifest.yaml
     local docker_server=$(echo ${IMAGE} |awk -F '/' '{printf $1}')
-    docker login --username=${DOCKER_USERNAME}  --password=${DOCKER_PASSWD} ${docker_server}
-    if [ "$?" != "0" ]; then
-        echo "docker login failure"
-        exit 1
-    fi
+    # machine already login
+#    docker login --username=${DOCKER_USERNAME}  --password=${DOCKER_PASSWD} ${docker_server}
+#    if [ "$?" != "0" ]; then
+#        echo "docker login failure"
+#        exit 1
+#    fi
 
     local imageSecretName="benchmark-image"
     local server_addr=$(${KUBECTL} config view --minify -o=jsonpath="{.clusters[*].cluster.server}")
