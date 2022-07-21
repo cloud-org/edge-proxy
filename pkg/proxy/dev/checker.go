@@ -67,7 +67,12 @@ func (c *checker) markAsUnhealthy() {
 	if c.isHealthy() {
 		c.setHealthy(false)
 		now := time.Now()
-		klog.Infof("cluster becomes unhealthy from %v, healthy status lasts %v, remote server: %v", time.Now(), now.Sub(c.lastTime), c.remoteServer.String())
+		klog.Infof(
+			"cluster becomes unhealthy from %v, healthy status lasts %v, remote server: %v",
+			time.Now(),
+			now.Sub(c.lastTime),
+			c.remoteServer.String(),
+		)
 		c.lastTime = now
 	}
 }

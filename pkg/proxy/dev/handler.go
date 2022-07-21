@@ -51,7 +51,12 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 
 	klog.Infof("new cache manager with storage wrapper and serializer manager")
 	// sharedFactory temporarily set as nil
-	cacheMgr, err := cachemanager.NewCacheManager(cfg.StorageWrapper, cfg.SerializerManager, cfg.RESTMapperManager, nil)
+	cacheMgr, err := cachemanager.NewCacheManager(
+		cfg.StorageWrapper,
+		cfg.SerializerManager,
+		cfg.RESTMapperManager,
+		nil,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not new cache manager, %w", err)
 	}
