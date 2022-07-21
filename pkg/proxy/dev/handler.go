@@ -1,10 +1,14 @@
 package dev
 
 import (
+	"fmt"
 	"net/http"
 
+	"github.com/openyurtio/openyurt/pkg/yurthub/cachemanager"
+	"github.com/openyurtio/openyurt/pkg/yurthub/proxy/local"
+	"k8s.io/klog/v2"
+
 	"code.aliyun.com/openyurt/edge-proxy/cmd/edge-proxy/app/config"
-	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/serializer"
 	"code.aliyun.com/openyurt/edge-proxy/pkg/proxy"
 	yurthubutil "github.com/openyurtio/openyurt/pkg/yurthub/proxy/util"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -24,8 +28,13 @@ type devFactory struct {
 }
 
 func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	// todo: 健康检查 unhealthy 进入 localProxy
-	d.loadBalancer.ServeHTTP(rw, req)
+	if d.loadBalancer.IsHealthy() {
+		d.loadBalancer.ServeHTTP(rw, req)
+		return
+	}
+
+	// if lb not healthy, then use localProxy
+	d.localProxy.ServeHTTP(rw, req)
 }
 
 func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan struct{}) (http.Handler, error) {
@@ -37,9 +46,18 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 	d.resolver = resolver
 
 	remoteServer := cfg.RemoteServers[0] // 假设一定成立
-	serializerManager := serializer.NewSerializerManager()
-	lb, _ := NewRemoteProxy(remoteServer, cfg.RT, serializerManager)
+	lb, _ := NewRemoteProxy(remoteServer, cfg.RT, cfg.SerializerManager, cfg.Client, stopCh)
 	d.loadBalancer = lb
+
+	klog.Infof("new cache manager with storage wrapper and serializer manager")
+	// sharedFactory temporarily set as nil
+	cacheMgr, err := cachemanager.NewCacheManager(cfg.StorageWrapper, cfg.SerializerManager, cfg.RESTMapperManager, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not new cache manager, %w", err)
+	}
+
+	// local proxy when lb is not healthy
+	d.localProxy = local.NewLocalProxy(cacheMgr, lb.IsHealthy)
 
 	return d.buildHandlerChain(d), nil
 }

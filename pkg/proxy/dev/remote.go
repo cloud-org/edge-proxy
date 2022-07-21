@@ -7,7 +7,9 @@ import (
 	"net/url"
 	"strings"
 
-	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/serializer"
+	"github.com/openyurtio/openyurt/pkg/yurthub/kubernetes/serializer"
+	"k8s.io/client-go/kubernetes"
+
 	yurthubutil "github.com/openyurtio/openyurt/pkg/yurthub/util"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	proxy2 "k8s.io/apimachinery/pkg/util/proxy"
@@ -28,6 +30,8 @@ type RemoteProxy struct {
 	currentTransport    http.RoundTripper
 	upgradeAwareHandler *proxy2.UpgradeAwareHandler
 	serializerManager   *serializer.SerializerManager
+	stopCh              <-chan struct{}
+	checker             *checker
 }
 
 // NewRemoteProxy 参数之后接着补充
@@ -35,13 +39,19 @@ func NewRemoteProxy(
 	remoteServer *url.URL,
 	transport http.RoundTripper,
 	serializerManager *serializer.SerializerManager,
+	client *kubernetes.Clientset,
+	stopCh <-chan struct{},
 ) (*RemoteProxy, error) {
 
 	rproxy := &RemoteProxy{
 		remoteServer:      remoteServer,
 		currentTransport:  transport,
 		serializerManager: serializerManager,
+		stopCh:            stopCh,
 	}
+
+	rproxy.checker = NewChecker(remoteServer, client)
+	rproxy.checker.start(rproxy.stopCh) // start checker
 
 	// todo: websocket 处理 可以实际测试下
 	upgradeAwareHandler := proxy2.NewUpgradeAwareHandler(
@@ -92,8 +102,7 @@ func (rp *RemoteProxy) Name() string {
 }
 
 func (rp *RemoteProxy) IsHealthy() bool {
-	// todo: 健康检查
-	return true
+	return rp.checker.isHealthy()
 }
 
 func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
@@ -164,8 +173,10 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 			}
 		}
 
-		// todo: cache 做缓存方便后续查询
-		//if info.Verb == "create" {
+		// todo: cache
+		//if info.IsResourceRequest && info.Verb == "list" &&
+		//	(info.Resource == "pods" || info.Resource == "configmaps") &&
+		//	strings.Contains(labelSelector, "type=consistency") { // only for consistency
 		//
 		//}
 

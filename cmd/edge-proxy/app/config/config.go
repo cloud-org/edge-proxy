@@ -2,11 +2,17 @@ package config
 
 import (
 	"fmt"
-	"github.com/imroc/req/v3"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/imroc/req/v3"
+	"github.com/openyurtio/openyurt/pkg/yurthub/cachemanager"
+	"github.com/openyurtio/openyurt/pkg/yurthub/kubernetes/meta"
+	"github.com/openyurtio/openyurt/pkg/yurthub/kubernetes/serializer"
+	"github.com/openyurtio/openyurt/pkg/yurthub/storage/factory"
+	"k8s.io/client-go/kubernetes"
 
 	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/config"
 
@@ -14,19 +20,21 @@ import (
 	"k8s.io/klog/v2"
 
 	"code.aliyun.com/openyurt/edge-proxy/cmd/edge-proxy/app/options"
-	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/serializer"
 	"code.aliyun.com/openyurt/edge-proxy/pkg/projectinfo"
 )
 
 // EdgeProxyConfiguration represents configuration of edge proxy
 type EdgeProxyConfiguration struct {
 	SerializerManager   *serializer.SerializerManager
+	StorageWrapper      cachemanager.StorageWrapper
+	RESTMapperManager   *meta.RESTMapperManager
 	RT                  http.RoundTripper
 	RemoteServers       []*url.URL
-	DishCachePath       string
+	DiskCachePath       string
 	BindAddr            string
 	EdgeProxyServerAddr string
 	EnableSampleHandler bool
+	Client              *kubernetes.Clientset
 }
 
 // Complete converts *options.BenchMarkOptions to *EdgeProxyConfiguration
@@ -45,14 +53,32 @@ func Complete(options *options.EdgeProxyOptions) (*EdgeProxyConfiguration, error
 		return nil, fmt.Errorf("could not new round tripper, %w", err)
 	}
 
+	// create disk storage
+	storageManager, err := factory.CreateStorage(options.DiskCachePath)
+	if err != nil {
+		klog.Errorf("could not create storage manager, %v", err)
+		return nil, err
+	}
+	storageWrapper := cachemanager.NewStorageWrapper(storageManager)
+	restMapperManager := meta.NewRESTMapperManager(storageManager)
+
+	client, err := config.InitClient(options.UseKubeConfig)
+	if err != nil {
+		klog.Errorf("create kubernetes client err: %v", err)
+		return nil, err
+	}
+
 	cfg := &EdgeProxyConfiguration{
+		SerializerManager:   serializerManager,
+		StorageWrapper:      storageWrapper,
+		RESTMapperManager:   restMapperManager,
+		RT:                  rt,
 		RemoteServers:       us,
+		DiskCachePath:       options.DiskCachePath,
 		BindAddr:            net.JoinHostPort("127.0.0.1", "10267"),
 		EdgeProxyServerAddr: net.JoinHostPort("127.0.0.1", "10261"),
-		DishCachePath:       options.DiskCachePath,
-		SerializerManager:   serializerManager,
-		RT:                  rt,
 		EnableSampleHandler: options.EnableSampleHandler,
+		Client:              client,
 	}
 
 	return cfg, nil

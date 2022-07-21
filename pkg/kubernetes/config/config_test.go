@@ -8,7 +8,7 @@ import (
 )
 
 func TestInitClient(t *testing.T) {
-	got, err := InitClient()
+	got, err := InitClient(true)
 	if err != nil {
 		t.Error(err)
 		return
