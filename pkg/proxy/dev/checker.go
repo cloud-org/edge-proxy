@@ -42,7 +42,7 @@ func (c *checker) loop(stopCh <-chan struct{}) {
 			klog.Infof("check exit when received stopCh close")
 			return
 		case <-timer.C:
-			klog.Infof("checker timer received")
+			//klog.Infof("checker timer received")
 			c.check()
 		}
 	}

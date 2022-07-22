@@ -18,10 +18,10 @@ type skipListFilter struct {
 	serializer *serializer.Serializer
 }
 
-func NewSkipListFilter(resource string, serializer *serializer.Serializer) *skipListFilter {
+func NewSkipListFilter(resource string, serializer *serializer.Serializer, prefix string) *skipListFilter {
 	return &skipListFilter{
 		resource:   resource,
-		prefix:     "skip-",
+		prefix:     prefix,
 		serializer: serializer,
 	}
 }

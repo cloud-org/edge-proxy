@@ -1,11 +1,16 @@
 package dev
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
+
+	"github.com/openyurtio/openyurt/pkg/yurthub/cachemanager"
 
 	"github.com/openyurtio/openyurt/pkg/yurthub/kubernetes/serializer"
 	"k8s.io/client-go/kubernetes"
@@ -30,6 +35,7 @@ type RemoteProxy struct {
 	currentTransport    http.RoundTripper
 	upgradeAwareHandler *proxy2.UpgradeAwareHandler
 	serializerManager   *serializer.SerializerManager
+	cacheMgr            cachemanager.CacheManager
 	stopCh              <-chan struct{}
 	checker             *checker
 }
@@ -37,6 +43,7 @@ type RemoteProxy struct {
 // NewRemoteProxy 参数之后接着补充
 func NewRemoteProxy(
 	remoteServer *url.URL,
+	cacheMgr cachemanager.CacheManager,
 	transport http.RoundTripper,
 	serializerManager *serializer.SerializerManager,
 	client *kubernetes.Clientset,
@@ -47,6 +54,7 @@ func NewRemoteProxy(
 		remoteServer:      remoteServer,
 		currentTransport:  transport,
 		serializerManager: serializerManager,
+		cacheMgr:          cacheMgr,
 		stopCh:            stopCh,
 	}
 
@@ -115,6 +123,12 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 	req := resp.Request
 	ctx := req.Context()
 
+	labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
+	// if test resource then return directly
+	if strings.Contains(labelSelector, resourceLabel) {
+		return nil
+	}
+
 	// re-added transfer-encoding=chunked response header for watch request
 	info, exists := apirequest.RequestInfoFrom(ctx)
 	if exists {
@@ -143,17 +157,14 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 
 		klog.Infof("request info is %+v\n", info)
 		// filter response data
-		labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
-		if info.IsResourceRequest && info.Verb == "list" &&
-			(info.Resource == "pods" || info.Resource == "configmaps") &&
-			strings.Contains(labelSelector, "type=filter") {
+		if checkLabel(info, labelSelector, filterLabel) {
 			wrapBody, needUncompressed := yurthubutil.NewGZipReaderCloser(resp.Header, resp.Body, req, "filter")
 			s := CreateSerializer(req, rp.serializerManager)
 			if s == nil {
 				klog.Errorf("CreateSerializer is nil")
 				return nil
 			}
-			filterManager := NewSkipListFilter(info.Resource, s)
+			filterManager := NewSkipListFilter(info.Resource, s, "skip-")
 
 			size, filterRc, err := NewFilterReadCloser(wrapBody, filterManager)
 			if err != nil {
@@ -173,12 +184,30 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 			}
 		}
 
-		// todo: cache
-		//if info.IsResourceRequest && info.Verb == "list" &&
-		//	(info.Resource == "pods" || info.Resource == "configmaps") &&
-		//	strings.Contains(labelSelector, "type=consistency") { // only for consistency
-		//
-		//}
+		if checkLabel(info, labelSelector, filterLabel) || checkLabel(info, labelSelector, funcLabel) {
+			klog.Infof("func/filter not need to cache")
+			return nil
+		}
+
+		// cache
+		if (info.IsResourceRequest && info.Verb == "list" &&
+			(info.Resource == "pods" || info.Resource == "configmaps") && labelSelector == "") ||
+			checkLabel(info, labelSelector, consistencyLabel) {
+			// cache resp with storage interface
+			if rp.cacheMgr != nil {
+				rc, prc := yurthubutil.NewDualReadCloser(req, resp.Body, true)
+				wrapPrc, _ := yurthubutil.NewGZipReaderCloser(resp.Header, prc, req, "cache-manager")
+				go func(req *http.Request, prc io.ReadCloser, stopCh <-chan struct{}) {
+					klog.Infof("cache consistency response")
+					err := rp.cacheMgr.CacheResponse(req, prc, stopCh)
+					if err != nil && err != io.EOF && !errors.Is(err, context.Canceled) {
+						klog.Errorf("%s response cache ended with error, %v", yurthubutil.ReqString(req), err)
+					}
+				}(req, wrapPrc, rp.stopCh)
+
+				resp.Body = rc
+			}
+		}
 
 	}
 
@@ -194,4 +223,14 @@ func CreateSerializer(req *http.Request, sm *serializer.SerializerManager) *seri
 		return nil
 	}
 	return sm.CreateSerializer(respContentType, info.APIGroup, info.APIVersion, info.Resource)
+}
+
+func checkLabel(info *apirequest.RequestInfo, selector string, label string) bool {
+	if info.IsResourceRequest && info.Verb == "list" &&
+		(info.Resource == "pods" || info.Resource == "configmaps") &&
+		strings.Contains(selector, label) { // only for consistency
+		return true
+	}
+
+	return false
 }

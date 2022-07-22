@@ -37,8 +37,8 @@ func CheckClusterIsHealthyByGet(url string) bool {
 		return false
 	}
 
-	klog.Infof("check livez content: %v", string(res))
 	if string(res) != "ok" {
+		klog.Infof("check livez content: %v", string(res))
 		return false
 	}
 
@@ -58,8 +58,8 @@ func CheckClusterIsHealthy(client *kubernetes.Clientset) bool {
 	}
 
 	res := string(content)
-	klog.Infof("check livez content: %v", res)
 	if res != "ok" {
+		klog.Infof("check livez content: %v", res)
 		return false
 	}
 

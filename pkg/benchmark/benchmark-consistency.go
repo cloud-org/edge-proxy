@@ -94,12 +94,13 @@ func (c *Consistency) Prepare(ctx context.Context) error {
 		"-I", "OUTPUT", "-p", "tcp", "--dport", "6443", "-j", "DROP").CombinedOutput()
 	if err != nil {
 		klog.Errorf("exec %s error %v", cmd, err)
-		return err
+		// manually exec iptables drop
+		//return err
 	}
 	klog.Infof("exec %s output %s", cmd, string(data))
 
-	// must sleep 60s, edge-hub need find Network disconnection
-	time.Sleep(time.Minute)
+	// must sleep 30s, edge-hub need find Network disconnection
+	time.Sleep(30 * time.Second)
 	return nil
 }
 

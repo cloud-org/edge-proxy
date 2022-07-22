@@ -90,7 +90,7 @@ metadata:
 spec:
   containers:
   - args:
-    - --v=2
+    - --v=5
     - --server-addr=${server_addr}
     - --log_file_max_size=1800
     - --logtostderr=false
