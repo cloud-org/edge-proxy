@@ -77,7 +77,7 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 	handler = yurthubutil.WithRequestContentType(handler)
 	handler = WithCacheHeaderCheck(handler)
-	handler = WithListRequestSelector(handler)
+	//handler = WithListRequestSelector(handler)
 
 	// inject request info
 	handler = filters.WithRequestInfo(handler, d.resolver)
