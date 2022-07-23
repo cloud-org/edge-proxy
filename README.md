@@ -40,8 +40,9 @@ make build 命令会生成两个二进制:edge-proxy 和 benchmark, 存放在目
 
 ```sh
 export server_addr=$(kubectl config view --minify -o=jsonpath="{.clusters[*].cluster.server}")
-./edge-proxy --server-addr ${server_addr} --use-kubeconfig true --enable-sample-handler true
-./benchmark --namespace default --use-kubeconfig
+export ns=$(kubectl get cm kube-root-ca.crt -o=jsonpath="{.metadata.namespace}")
+./edge-proxy --server-addr ${server_addr} --use-kubeconfig true --enable-sample-handler true --disk-cache-path ~/.kube/cloudnative-challenge/cache
+./benchmark --namespace ${ns} --use-kubeconfig
 ```
 
 ## docker build and push

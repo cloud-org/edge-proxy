@@ -36,6 +36,14 @@ clean:
 gen-yaml:
 	hack/make-rules/manifest.sh ${IMAGE_REPO}/edge-proxy:${GIT_VERSION} ${DOCKER_USERNAME} ${DOCKER_PASSWD}
 
+aliyun-config:
+	rm ~/.kube/config
+	ln -s ~/.kube/aliyun_config ~/.kube/config
+
+local-config:
+	rm ~/.kube/config
+	ln -s ~/.kube/minikube_config ~/.kube/config
+
 docker-build-deploy:
 	hack/make-rules/manifest.sh ${IMAGE_REPO}/edge-proxy:${GIT_VERSION} ${DOCKER_USERNAME} ${DOCKER_PASSWD}
 	docker buildx build --push ${DOCKER_BUILD_ARGS} --platform ${TARGET_PLATFORMS} -f hack/dockerfiles/Dockerfile . -t ${IMAGE_REPO}/edge-proxy:${GIT_VERSION}
