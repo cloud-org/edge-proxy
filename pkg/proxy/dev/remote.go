@@ -185,7 +185,7 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 		}
 
 		if checkLabel(info, labelSelector, filterLabel) || checkLabel(info, labelSelector, funcLabel) {
-			klog.Infof("func/filter not need to cache")
+			klog.Infof("functional/filter label not need to cache")
 			return nil
 		}
 

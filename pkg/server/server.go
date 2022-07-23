@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"k8s.io/klog/v2"
+
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -71,7 +73,15 @@ func registerHandlers(c *mux.Router) {
 	profile.Install(c)
 
 	// register handler for metrics
-	c.Handle("/metrics", promhttp.Handler())
+	c.Handle("/metrics", &wrapHandler{})
+}
+
+type wrapHandler struct {
+}
+
+func (wrapHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	klog.Infof("enter metrics")
+	promhttp.Handler().ServeHTTP(rw, req)
 }
 
 // healthz returns ok for healthz request

@@ -2,21 +2,16 @@ package dev
 
 import (
 	"fmt"
+	"io"
 	"net/http"
-	"strings"
 
 	"github.com/openyurtio/openyurt/pkg/yurthub/cachemanager"
 	"github.com/openyurtio/openyurt/pkg/yurthub/util"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
 
 	"code.aliyun.com/openyurt/edge-proxy/cmd/edge-proxy/app/config"
 	"code.aliyun.com/openyurt/edge-proxy/pkg/proxy"
 	yurthubutil "github.com/openyurtio/openyurt/pkg/yurthub/proxy/util"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
-	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -78,6 +73,7 @@ func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 	handler = yurthubutil.WithRequestContentType(handler)
 	handler = WithCacheHeaderCheck(handler)
 	//handler = WithListRequestSelector(handler)
+	handler = printCreateReqBody(handler)
 
 	// inject request info
 	handler = filters.WithRequestInfo(handler, d.resolver)
@@ -107,50 +103,33 @@ func WithCacheHeaderCheck(handler http.Handler) http.Handler {
 	})
 }
 
-func WithListRequestSelector(handler http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+func printCreateReqBody(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
+
 		if info, ok := apirequest.RequestInfoFrom(ctx); ok {
-			if info.IsResourceRequest && info.Verb == "list" && info.Name == "" {
-				// list request with fieldSelector=metadata.name does not need to set selector string
-				opts := metainternalversion.ListOptions{}
-				if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, &opts); err == nil {
-					str := selectorString(opts.LabelSelector, opts.FieldSelector)
-					//klog.Infof("ls and fs str is %v", str)
-					if str != "" {
-						ctx = util.WithListSelector(ctx, str)
-						req = req.WithContext(ctx)
+			// 打印 create 的 body 判断 resourceusage 的创建 body，然后本地进行 benchmark
+			if info.Verb == "create" {
+				pr, prc := util.NewDualReadCloser(req, req.Body, false)
+				go func(reader io.ReadCloser) {
+					reqBody, err := io.ReadAll(prc)
+					if err != nil {
+						klog.Errorf("readAll req.Body err: %v", err)
+						return
 					}
-				}
+					klog.Infof("info: %v, req.Body is %v", util.ReqString(req), string(reqBody))
+				}(prc)
+				req.Body = pr
+				// 错误使用方法 req.Body 读完一次就没了，所以不能直接读完就不管
+				//b, err := io.ReadAll(req.Body)
+				//if err != nil {
+				//	klog.Errorf("read req body err: %v", err)
+				//	return
+				//}
+				//klog.Infof("req.Body is %v", string(b))
 			}
 		}
 
-		handler.ServeHTTP(w, req)
+		handler.ServeHTTP(rw, req)
 	})
-}
-
-// selectorString returns the string of label and field selector
-func selectorString(lSelector labels.Selector, fSelector fields.Selector) string {
-	var ls string
-	var fs string
-	if lSelector != nil {
-		ls = lSelector.String()
-	}
-
-	if fSelector != nil {
-		fs = fSelector.String()
-	}
-
-	switch {
-	case ls != "" && fs != "":
-		return strings.Join([]string{ls, fs}, "&")
-
-	case ls != "":
-		return ls
-
-	case fs != "":
-		return fs
-	}
-
-	return ""
 }

@@ -94,7 +94,7 @@ func (c *Consistency) Prepare(ctx context.Context) error {
 		"-I", "OUTPUT", "-p", "tcp", "--dport", "6443", "-j", "DROP").CombinedOutput()
 	if err != nil {
 		klog.Errorf("exec %s error %v", cmd, err)
-		// manually exec iptables drop
+		klog.Infof("you should manually exec cmd: %v", cmd)
 		//return err
 	}
 	klog.Infof("exec %s output %s", cmd, string(data))
