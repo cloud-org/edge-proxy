@@ -13,8 +13,6 @@ import (
 	"github.com/openyurtio/openyurt/pkg/yurthub/cachemanager"
 
 	"github.com/openyurtio/openyurt/pkg/yurthub/kubernetes/serializer"
-	"k8s.io/client-go/kubernetes"
-
 	yurthubutil "github.com/openyurtio/openyurt/pkg/yurthub/util"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	proxy2 "k8s.io/apimachinery/pkg/util/proxy"
@@ -47,7 +45,6 @@ func NewRemoteProxy(
 	cacheMgr cachemanager.CacheManager,
 	transport http.RoundTripper,
 	serializerManager *serializer.SerializerManager,
-	client *kubernetes.Clientset,
 	cc *cacheChecker,
 	stopCh <-chan struct{},
 ) (*RemoteProxy, error) {
@@ -61,7 +58,7 @@ func NewRemoteProxy(
 		stopCh:            stopCh,
 	}
 
-	rproxy.checker = NewChecker(remoteServer, client)
+	rproxy.checker = NewChecker(remoteServer)
 	rproxy.checker.start(rproxy.stopCh) // start checker
 
 	// todo: websocket 处理 可以实际测试下

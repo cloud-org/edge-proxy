@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/health"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 )
 
@@ -15,14 +14,12 @@ type checker struct {
 	remoteServer   *url.URL
 	clusterHealthy bool
 	lastTime       time.Time
-	client         *kubernetes.Clientset
 }
 
-func NewChecker(remoteServer *url.URL, client *kubernetes.Clientset) *checker {
+func NewChecker(remoteServer *url.URL) *checker {
 	return &checker{
 		remoteServer: remoteServer,
 		lastTime:     time.Now(),
-		client:       client,
 	}
 }
 

@@ -65,7 +65,7 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 	cc := NewCacheChecker()
 	d.cc = cc
 	remoteServer := cfg.RemoteServers[0] // 假设一定成立
-	lb, _ := NewRemoteProxy(remoteServer, cacheMgr, cfg.RT, cfg.SerializerManager, cfg.Client, cc, stopCh)
+	lb, _ := NewRemoteProxy(remoteServer, cacheMgr, cfg.RT, cfg.SerializerManager, cc, stopCh)
 	d.loadBalancer = lb
 
 	// local proxy when lb is not healthy

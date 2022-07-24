@@ -7,14 +7,12 @@ import (
 	"net/url"
 	"strings"
 
+	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/config"
 	"github.com/imroc/req/v3"
 	"github.com/openyurtio/openyurt/pkg/yurthub/cachemanager"
 	"github.com/openyurtio/openyurt/pkg/yurthub/kubernetes/meta"
 	"github.com/openyurtio/openyurt/pkg/yurthub/kubernetes/serializer"
 	"github.com/openyurtio/openyurt/pkg/yurthub/storage/factory"
-	"k8s.io/client-go/kubernetes"
-
-	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/config"
 
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -34,7 +32,6 @@ type EdgeProxyConfiguration struct {
 	BindAddr            string
 	EdgeProxyServerAddr string
 	EnableSampleHandler bool
-	Client              *kubernetes.Clientset
 }
 
 // Complete converts *options.BenchMarkOptions to *EdgeProxyConfiguration
@@ -62,12 +59,6 @@ func Complete(options *options.EdgeProxyOptions) (*EdgeProxyConfiguration, error
 	storageWrapper := cachemanager.NewStorageWrapper(storageManager)
 	restMapperManager := meta.NewRESTMapperManager(storageManager)
 
-	client, err := config.InitClient(options.UseKubeConfig)
-	if err != nil {
-		klog.Errorf("create kubernetes client err: %v", err)
-		return nil, err
-	}
-
 	cfg := &EdgeProxyConfiguration{
 		SerializerManager:   serializerManager,
 		StorageWrapper:      storageWrapper,
@@ -78,7 +69,6 @@ func Complete(options *options.EdgeProxyOptions) (*EdgeProxyConfiguration, error
 		BindAddr:            net.JoinHostPort("127.0.0.1", "10267"),
 		EdgeProxyServerAddr: net.JoinHostPort("127.0.0.1", "10261"),
 		EnableSampleHandler: options.EnableSampleHandler,
-		Client:              client,
 	}
 
 	return cfg, nil
