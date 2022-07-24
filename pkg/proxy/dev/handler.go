@@ -91,20 +91,19 @@ func (d *devFactory) WithCacheHeaderCheck(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 
-		//if info, ok := apirequest.RequestInfoFrom(ctx); ok {
-		//	labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
-		//if (info.IsResourceRequest && info.Verb == "list" &&
-		//	(info.Resource == "pods" || info.Resource == "configmaps") && labelSelector == "") ||
-		//	checkLabel(info, labelSelector, consistencyLabel) {
-		//}
+		if info, ok := apirequest.RequestInfoFrom(ctx); ok {
+			labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
+			if (info.IsResourceRequest && info.Verb == "list" &&
+				(info.Resource == "pods" || info.Resource == "configmaps") && labelSelector == "") ||
+				checkLabel(info, labelSelector, consistencyLabel) {
 
-		if d.cc.CanCache() {
-			//klog.Infof("req labelSelector is %v, add cache header and comp", labelSelector)
-			// add cache header
-			ctx = util.WithReqCanCache(ctx, true)
-			// add comp bench
-			ctx = util.WithClientComponent(ctx, "bench")
-			req = req.WithContext(ctx)
+				//klog.Infof("req labelSelector is %v, add cache header and comp", labelSelector)
+				// add cache header
+				//ctx = util.WithReqCanCache(ctx, true)
+				// add comp bench
+				ctx = util.WithClientComponent(ctx, "bench")
+				req = req.WithContext(ctx)
+			}
 		}
 
 		handler.ServeHTTP(w, req)
