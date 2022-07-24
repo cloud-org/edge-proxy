@@ -28,7 +28,7 @@ func (r *Resourceusage) Prepare(ctx context.Context) error {
 	// start cpu profile
 	klog.Infof("prepare to start cpu profile")
 	go func() {
-		_, err := exec.Command("curl", "http://127.0.0.1:10267/debug/pprof/profile", "-o", "profile.txt").CombinedOutput()
+		_, err := exec.Command("curl", "http://127.0.0.1:10267/debug/pprof/profile?seconds=60", "-o", "profile.txt").CombinedOutput()
 		if err != nil {
 			klog.Errorf("cpu err: %v", err)
 			return
