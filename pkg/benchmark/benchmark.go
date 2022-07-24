@@ -133,7 +133,10 @@ func NewBenchMark(deps *options.BenchMarkOptions) (*BenchMark, error) {
 	b.SubBenchMarkers = append(b.SubBenchMarkers,
 		NewFunctional(b.Namespace, proxycs, cs, b.ProxyConfigMapLister, b.ConfigMapLister),
 		NewFilter(b.Namespace, proxycs, cs),
-		NewConsistency(b.Namespace, proxycs, cs))
+		NewResourceusage(b.Namespace, proxycs, cs),
+		NewConsistency(b.Namespace, proxycs, cs),
+	)
+
 	return b, nil
 }
 

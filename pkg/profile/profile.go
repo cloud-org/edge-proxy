@@ -12,7 +12,7 @@ import (
 // Install adds the Profiling webservice to the given mux.
 func Install(c *mux.Router) {
 	c.HandleFunc("/debug/pprof/profile", func(rw http.ResponseWriter, req *http.Request) {
-		klog.Infof("enter pprof profile")
+		klog.Infof("enter pprof profile: %v", req.URL.String())
 		pprof.Profile(rw, req)
 	})
 	c.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
