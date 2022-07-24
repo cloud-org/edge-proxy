@@ -1,9 +1,12 @@
 package dev
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+
+	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/types"
 
 	"github.com/openyurtio/openyurt/pkg/yurthub/cachemanager"
 	"github.com/openyurtio/openyurt/pkg/yurthub/util"
@@ -26,6 +29,7 @@ type devFactory struct {
 	resolver     apirequest.RequestInfoResolver
 	loadBalancer LoadBalancer
 	localProxy   http.Handler
+	cc           *cacheChecker
 }
 
 func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -58,8 +62,10 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 		return nil, fmt.Errorf("could not new cache manager, %w", err)
 	}
 
+	cc := NewCacheChecker()
+	d.cc = cc
 	remoteServer := cfg.RemoteServers[0] // 假设一定成立
-	lb, _ := NewRemoteProxy(remoteServer, cacheMgr, cfg.RT, cfg.SerializerManager, cfg.Client, stopCh)
+	lb, _ := NewRemoteProxy(remoteServer, cacheMgr, cfg.RT, cfg.SerializerManager, cfg.Client, cc, stopCh)
 	d.loadBalancer = lb
 
 	// local proxy when lb is not healthy
@@ -71,9 +77,9 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 // 增加中间件
 func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 	handler = yurthubutil.WithRequestContentType(handler)
-	handler = WithCacheHeaderCheck(handler)
+	handler = d.WithCacheHeaderCheck(handler)
 	//handler = WithListRequestSelector(handler)
-	handler = printCreateReqBody(handler)
+	handler = d.printCreateReqBody(handler)
 
 	// inject request info
 	handler = filters.WithRequestInfo(handler, d.resolver)
@@ -81,43 +87,51 @@ func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 	return handler
 }
 
-func WithCacheHeaderCheck(handler http.Handler) http.Handler {
+func (d *devFactory) WithCacheHeaderCheck(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 
-		if info, ok := apirequest.RequestInfoFrom(ctx); ok {
-			labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
-			if (info.IsResourceRequest && info.Verb == "list" &&
-				(info.Resource == "pods" || info.Resource == "configmaps") && labelSelector == "") ||
-				checkLabel(info, labelSelector, consistencyLabel) {
-				klog.Infof("req labelSelector is %v, add cache header and comp", labelSelector)
-				// add cache header
-				ctx = util.WithReqCanCache(ctx, true)
-				// add comp bench
-				ctx = util.WithClientComponent(ctx, "bench")
-				req = req.WithContext(ctx)
-			}
+		//if info, ok := apirequest.RequestInfoFrom(ctx); ok {
+		//	labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
+		//if (info.IsResourceRequest && info.Verb == "list" &&
+		//	(info.Resource == "pods" || info.Resource == "configmaps") && labelSelector == "") ||
+		//	checkLabel(info, labelSelector, consistencyLabel) {
+		//}
+
+		if d.cc.CanCache() {
+			//klog.Infof("req labelSelector is %v, add cache header and comp", labelSelector)
+			// add cache header
+			ctx = util.WithReqCanCache(ctx, true)
+			// add comp bench
+			ctx = util.WithClientComponent(ctx, "bench")
+			req = req.WithContext(ctx)
 		}
 
 		handler.ServeHTTP(w, req)
 	})
 }
 
-func printCreateReqBody(handler http.Handler) http.Handler {
+func (d *devFactory) printCreateReqBody(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 
 		if info, ok := apirequest.RequestInfoFrom(ctx); ok {
 			// 打印 create 的 body 判断 resourceusage 的创建 body，然后本地进行 benchmark
-			if info.Verb == "create" {
+			if info.Verb == "create" && !d.cc.CanCache() {
 				pr, prc := util.NewDualReadCloser(req, req.Body, false)
 				go func(reader io.ReadCloser) {
-					reqBody, err := io.ReadAll(prc)
+					//reqBody, err := io.ReadAll(prc)
+					var createReq types.ResourceCreateReq
+					err := json.NewDecoder(prc).Decode(&createReq)
 					if err != nil {
 						klog.Errorf("readAll req.Body err: %v", err)
 						return
 					}
-					klog.Infof("info: %v, req.Body is %v", util.ReqString(req), string(reqBody))
+					//klog.Infof("info: %v, req.Body is %v", util.ReqString(req), string(reqBody))
+					if createReq.Metadata.Labels.Type == "consistency" { // set cache true
+						klog.Infof("set cache true")
+						d.cc.SetCanCache()
+					}
 				}(prc)
 				req.Body = pr
 				// 错误使用方法 req.Body 读完一次就没了，所以不能直接读完就不管

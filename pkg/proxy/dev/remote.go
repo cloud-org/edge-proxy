@@ -38,6 +38,7 @@ type RemoteProxy struct {
 	cacheMgr            cachemanager.CacheManager
 	stopCh              <-chan struct{}
 	checker             *checker
+	cc                  *cacheChecker
 }
 
 // NewRemoteProxy 参数之后接着补充
@@ -47,6 +48,7 @@ func NewRemoteProxy(
 	transport http.RoundTripper,
 	serializerManager *serializer.SerializerManager,
 	client *kubernetes.Clientset,
+	cc *cacheChecker,
 	stopCh <-chan struct{},
 ) (*RemoteProxy, error) {
 
@@ -55,6 +57,7 @@ func NewRemoteProxy(
 		currentTransport:  transport,
 		serializerManager: serializerManager,
 		cacheMgr:          cacheMgr,
+		cc:                cc,
 		stopCh:            stopCh,
 	}
 
@@ -194,7 +197,7 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 			(info.Resource == "pods" || info.Resource == "configmaps") && labelSelector == "") ||
 			checkLabel(info, labelSelector, consistencyLabel) {
 			// cache resp with storage interface
-			if rp.cacheMgr != nil {
+			if rp.cacheMgr != nil && rp.cc.CanCache() {
 				rc, prc := yurthubutil.NewDualReadCloser(req, resp.Body, true)
 				wrapPrc, _ := yurthubutil.NewGZipReaderCloser(resp.Header, prc, req, "cache-manager")
 				go func(req *http.Request, prc io.ReadCloser, stopCh <-chan struct{}) {
