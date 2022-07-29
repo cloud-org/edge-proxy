@@ -2,13 +2,11 @@ package dev
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 
 	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/types"
 
-	"github.com/openyurtio/openyurt/pkg/yurthub/cachemanager"
 	"github.com/openyurtio/openyurt/pkg/yurthub/util"
 	"k8s.io/klog/v2"
 
@@ -50,22 +48,13 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 	resolver := server.NewRequestInfoResolver(serverCfg)
 	d.resolver = resolver
 
-	klog.Infof("new cache manager with storage wrapper and serializer manager")
-	// sharedFactory temporarily set as nil
-	cacheMgr, err := cachemanager.NewCacheManager(
-		cfg.StorageWrapper,
-		cfg.SerializerManager,
-		cfg.RESTMapperManager,
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("could not new cache manager, %w", err)
-	}
-
 	cc := NewCacheChecker()
 	d.cc = cc
+
 	remoteServer := cfg.RemoteServers[0] // 假设一定成立
-	lb, _ := NewRemoteProxy(remoteServer, cacheMgr, cfg.RT, cfg.SerializerManager, cc, stopCh)
+
+	cacheMgr := NewCacheMgr(cfg.StorageMgr)
+	lb, _ := NewRemoteProxy(remoteServer, cacheMgr, cfg.RT, cc, stopCh)
 	d.loadBalancer = lb
 
 	// local proxy when lb is not healthy
@@ -77,37 +66,12 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 // 增加中间件
 func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 	handler = yurthubutil.WithRequestContentType(handler)
-	handler = d.WithCacheHeaderCheck(handler)
-	//handler = WithListRequestSelector(handler)
 	handler = d.printCreateReqBody(handler)
 
 	// inject request info
 	handler = filters.WithRequestInfo(handler, d.resolver)
 
 	return handler
-}
-
-func (d *devFactory) WithCacheHeaderCheck(handler http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx := req.Context()
-
-		if info, ok := apirequest.RequestInfoFrom(ctx); ok {
-			labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
-			if (info.IsResourceRequest && info.Verb == "list" &&
-				(info.Resource == "pods" || info.Resource == "configmaps") && labelSelector == "") ||
-				checkLabel(info, labelSelector, consistencyLabel) {
-
-				//klog.Infof("req labelSelector is %v, add cache header and comp", labelSelector)
-				// add cache header
-				//ctx = util.WithReqCanCache(ctx, true)
-				// add comp bench
-				ctx = util.WithClientComponent(ctx, "bench")
-				req = req.WithContext(ctx)
-			}
-		}
-
-		handler.ServeHTTP(w, req)
-	})
 }
 
 func (d *devFactory) printCreateReqBody(handler http.Handler) http.Handler {

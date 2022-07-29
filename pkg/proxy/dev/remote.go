@@ -1,8 +1,6 @@
 package dev
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,9 +8,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/openyurtio/openyurt/pkg/yurthub/cachemanager"
-
-	"github.com/openyurtio/openyurt/pkg/yurthub/kubernetes/serializer"
 	yurthubutil "github.com/openyurtio/openyurt/pkg/yurthub/util"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	proxy2 "k8s.io/apimachinery/pkg/util/proxy"
@@ -32,8 +27,7 @@ type RemoteProxy struct {
 	reverseProxy        *httputil.ReverseProxy
 	currentTransport    http.RoundTripper
 	upgradeAwareHandler *proxy2.UpgradeAwareHandler
-	serializerManager   *serializer.SerializerManager
-	cacheMgr            cachemanager.CacheManager
+	cacheMgr            *CacheMgr
 	stopCh              <-chan struct{}
 	checker             *checker
 	cc                  *cacheChecker
@@ -42,20 +36,18 @@ type RemoteProxy struct {
 // NewRemoteProxy 参数之后接着补充
 func NewRemoteProxy(
 	remoteServer *url.URL,
-	cacheMgr cachemanager.CacheManager,
+	cacheMgr *CacheMgr,
 	transport http.RoundTripper,
-	serializerManager *serializer.SerializerManager,
 	cc *cacheChecker,
 	stopCh <-chan struct{},
 ) (*RemoteProxy, error) {
 
 	rproxy := &RemoteProxy{
-		remoteServer:      remoteServer,
-		currentTransport:  transport,
-		serializerManager: serializerManager,
-		cacheMgr:          cacheMgr,
-		cc:                cc,
-		stopCh:            stopCh,
+		remoteServer:     remoteServer,
+		currentTransport: transport,
+		cacheMgr:         cacheMgr,
+		cc:               cc,
+		stopCh:           stopCh,
 	}
 
 	rproxy.checker = NewChecker(remoteServer)
@@ -134,10 +126,6 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 	info, exists := apirequest.RequestInfoFrom(ctx)
 	if exists {
 		if info.Verb == "watch" {
-			klog.Infof(
-				"add transfer-encoding=chunked header into response for req %s",
-				yurthubutil.ReqString(req),
-			)
 			h := resp.Header
 			if hv := h.Get("Transfer-Encoding"); hv == "" {
 				h.Add("Transfer-Encoding", "chunked")
@@ -151,6 +139,7 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 		klog.Infof("request info is %+v\n", info)
 		// filter response data
 		if checkLabel(info, labelSelector, filterLabel) {
+			// todo: 重写 gzip reader 因为里面有对 component 进行获取
 			wrapBody, needUncompressed := yurthubutil.NewGZipReaderCloser(resp.Header, resp.Body, req, "filter")
 			size, filterRc, err := NewFilterReadCloser(wrapBody, info.Resource, "skip-")
 			if err != nil {
@@ -183,13 +172,13 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 			if rp.cacheMgr != nil && rp.cc.CanCache() {
 				rc, prc := yurthubutil.NewDualReadCloser(req, resp.Body, true)
 				wrapPrc, _ := yurthubutil.NewGZipReaderCloser(resp.Header, prc, req, "cache-manager")
-				go func(req *http.Request, prc io.ReadCloser, stopCh <-chan struct{}) {
+				go func(req *http.Request, prc io.ReadCloser) {
 					klog.Infof("cache consistency response")
-					err := rp.cacheMgr.CacheResponse(req, prc, stopCh)
-					if err != nil && err != io.EOF && !errors.Is(err, context.Canceled) {
-						klog.Errorf("%s response cache ended with error, %v", yurthubutil.ReqString(req), err)
+					err := rp.cacheMgr.CacheResponse(info, prc)
+					if err != nil {
+						klog.Errorf("%s response cache ended with error, %v", info.Resource, err)
 					}
-				}(req, wrapPrc, rp.stopCh)
+				}(req, wrapPrc)
 
 				resp.Body = rc
 			}
