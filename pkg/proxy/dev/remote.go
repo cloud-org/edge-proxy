@@ -85,6 +85,7 @@ func NewRemoteProxy(
 }
 
 func (rp *RemoteProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	// todo: remove
 	if httpstream.IsUpgradeRequest(req) {
 		klog.Infof("get upgrade request %s", req.URL)
 		rp.upgradeAwareHandler.ServeHTTP(rw, req)
@@ -133,40 +134,25 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 	info, exists := apirequest.RequestInfoFrom(ctx)
 	if exists {
 		if info.Verb == "watch" {
-			klog.V(5).Infof(
+			klog.Infof(
 				"add transfer-encoding=chunked header into response for req %s",
 				yurthubutil.ReqString(req),
 			)
 			h := resp.Header
 			if hv := h.Get("Transfer-Encoding"); hv == "" {
 				h.Add("Transfer-Encoding", "chunked")
+				klog.Infof("add Transfer-Encoding header")
 			}
 		}
 	}
 
 	// 成功响应
 	if resp.StatusCode >= http.StatusOK && resp.StatusCode <= http.StatusPartialContent {
-		// prepare response content type
-		reqContentType, _ := yurthubutil.ReqContentTypeFrom(ctx)
-		respContentType := resp.Header.Get("Content-Type")
-		if len(respContentType) == 0 {
-			respContentType = reqContentType
-		}
-		ctx = yurthubutil.WithRespContentType(ctx, respContentType)
-		req = req.WithContext(ctx)
-
 		klog.Infof("request info is %+v\n", info)
 		// filter response data
 		if checkLabel(info, labelSelector, filterLabel) {
 			wrapBody, needUncompressed := yurthubutil.NewGZipReaderCloser(resp.Header, resp.Body, req, "filter")
-			s := CreateSerializer(req, rp.serializerManager)
-			if s == nil {
-				klog.Errorf("CreateSerializer is nil")
-				return nil
-			}
-			filterManager := NewSkipListFilter(info.Resource, s, "skip-")
-
-			size, filterRc, err := NewFilterReadCloser(wrapBody, filterManager)
+			size, filterRc, err := NewFilterReadCloser(wrapBody, info.Resource, "skip-")
 			if err != nil {
 				klog.Errorf("failed to filter response for %s, %v", yurthubutil.ReqString(req), err)
 				return err
@@ -212,17 +198,6 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 	}
 
 	return nil
-}
-
-func CreateSerializer(req *http.Request, sm *serializer.SerializerManager) *serializer.Serializer {
-	ctx := req.Context()
-	respContentType, _ := yurthubutil.RespContentTypeFrom(ctx)
-	info, _ := apirequest.RequestInfoFrom(ctx)
-	if respContentType == "" || info == nil || info.APIVersion == "" || info.Resource == "" {
-		klog.Infof("CreateSerializer failed , info is :%+v", info)
-		return nil
-	}
-	return sm.CreateSerializer(respContentType, info.APIGroup, info.APIVersion, info.Resource)
 }
 
 func checkLabel(info *apirequest.RequestInfo, selector string, label string) bool {
