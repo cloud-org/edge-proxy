@@ -7,6 +7,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"sync"
 
 	"code.aliyun.com/openyurt/edge-proxy/pkg/util"
 
@@ -24,6 +25,7 @@ func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
 }
 
 type RemoteProxy struct {
+	sync.RWMutex
 	remoteServer        *url.URL
 	reverseProxy        *httputil.ReverseProxy
 	currentTransport    http.RoundTripper
@@ -170,7 +172,7 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 			(info.Resource == "pods" || info.Resource == "configmaps") && labelSelector == "") ||
 			checkLabel(info, labelSelector, consistencyLabel) {
 			// cache resp with storage interface
-			if rp.cacheMgr != nil && rp.cc.CanCache() {
+			if rp.GetCacheMgr() != nil && rp.cc.CanCache() {
 				rc, prc := util.NewDualReadCloser(req, resp.Body, true)
 				wrapPrc, _ := util.NewGZipReaderCloser(resp.Header, prc, info, "cache-manager")
 				go func(req *http.Request, prc io.ReadCloser) {
@@ -198,4 +200,16 @@ func checkLabel(info *apirequest.RequestInfo, selector string, label string) boo
 	}
 
 	return false
+}
+
+func (rp *RemoteProxy) SetCacheMgr(cm *CacheMgr) {
+	rp.Lock()
+	defer rp.Unlock()
+	rp.cacheMgr = cm
+}
+
+func (rp *RemoteProxy) GetCacheMgr() *CacheMgr {
+	rp.RLock()
+	defer rp.RUnlock()
+	return rp.cacheMgr
 }

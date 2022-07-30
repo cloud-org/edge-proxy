@@ -7,12 +7,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/openyurtio/openyurt/pkg/yurthub/storage"
-
 	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/config"
 	"github.com/imroc/req/v3"
-	"github.com/openyurtio/openyurt/pkg/yurthub/storage/factory"
-
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
@@ -22,7 +18,6 @@ import (
 
 // EdgeProxyConfiguration represents configuration of edge proxy
 type EdgeProxyConfiguration struct {
-	StorageMgr          storage.Store
 	RT                  http.RoundTripper
 	RemoteServers       []*url.URL
 	DiskCachePath       string
@@ -45,15 +40,7 @@ func Complete(options *options.EdgeProxyOptions) (*EdgeProxyConfiguration, error
 		return nil, fmt.Errorf("could not new round tripper, %w", err)
 	}
 
-	// create disk storage
-	storageManager, err := factory.CreateStorage(options.DiskCachePath)
-	if err != nil {
-		klog.Errorf("could not create storage manager, %v", err)
-		return nil, err
-	}
-
 	cfg := &EdgeProxyConfiguration{
-		StorageMgr:          storageManager,
 		RT:                  rt,
 		RemoteServers:       us,
 		DiskCachePath:       options.DiskCachePath,

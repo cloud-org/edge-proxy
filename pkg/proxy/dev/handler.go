@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
+
+	"github.com/openyurtio/openyurt/pkg/yurthub/storage/factory"
 
 	"code.aliyun.com/openyurt/edge-proxy/pkg/util"
 
@@ -26,8 +29,9 @@ func init() {
 type devFactory struct {
 	resolver     apirequest.RequestInfoResolver
 	loadBalancer LoadBalancer
-	localProxy   http.Handler
+	localProxy   LoadBalancer
 	cc           *cacheChecker
+	cfg          *config.EdgeProxyConfiguration
 }
 
 func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -40,7 +44,21 @@ func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	d.localProxy.ServeHTTP(rw, req)
 }
 
+func (d *devFactory) initCacheMgr() {
+	storageManager, err := factory.CreateStorage(d.cfg.DiskCachePath)
+	if err != nil {
+		klog.Errorf("could not create storage manager, %v", err)
+		return
+	}
+	cacheMgr := NewCacheMgr(storageManager)
+	d.loadBalancer.SetCacheMgr(cacheMgr)
+	d.localProxy.SetCacheMgr(cacheMgr)
+	klog.Infof("set cache mgr")
+}
+
 func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan struct{}) (http.Handler, error) {
+
+	d.cfg = cfg
 
 	serverCfg := &server.Config{
 		LegacyAPIGroupPrefixes: sets.NewString(server.DefaultLegacyAPIPrefix),
@@ -53,12 +71,12 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 
 	remoteServer := cfg.RemoteServers[0] // 假设一定成立
 
-	cacheMgr := NewCacheMgr(cfg.StorageMgr)
-	lb, _ := NewRemoteProxy(remoteServer, cacheMgr, cfg.RT, cc, stopCh)
+	//cacheMgr := NewCacheMgr(cfg.StorageMgr)
+	lb, _ := NewRemoteProxy(remoteServer, nil, cfg.RT, cc, stopCh)
 	d.loadBalancer = lb
 
 	// local proxy when lb is not healthy
-	d.localProxy = NewLocalProxy(cacheMgr, lb.IsHealthy)
+	d.localProxy = NewLocalProxy(nil, lb.IsHealthy)
 
 	return d.buildHandlerChain(d), nil
 }
@@ -67,6 +85,7 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 	//handler = yurthubutil.WithRequestContentType(handler)
 	handler = d.printCreateReqBody(handler)
+	//handler = d.WithMaxInFlightLimit(handler, 200) // 两百个并发
 
 	// inject request info
 	handler = filters.WithRequestInfo(handler, d.resolver)
@@ -94,6 +113,7 @@ func (d *devFactory) printCreateReqBody(handler http.Handler) http.Handler {
 					if createReq.Metadata.Labels.Type == "consistency" { // set cache true
 						klog.Infof("set cache true")
 						d.cc.SetCanCache()
+						d.initCacheMgr()
 					}
 				}(prc)
 				req.Body = pr
@@ -108,5 +128,32 @@ func (d *devFactory) printCreateReqBody(handler http.Handler) http.Handler {
 		}
 
 		handler.ServeHTTP(rw, req)
+	})
+}
+
+// WithMaxInFlightLimit limits the number of in-flight requests. and when in flight
+// requests exceeds the threshold, the following incoming requests will be rejected.
+func (d *devFactory) WithMaxInFlightLimit(handler http.Handler, limit int) http.Handler {
+	// 闭包，所以这里不会重复初始化
+	var reqChan chan bool
+	if limit > 0 {
+		reqChan = make(chan bool, limit)
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		select {
+		case reqChan <- true:
+			klog.Infof("start proxying: %s %s, in flight requests: %d", strings.ToLower(req.Method), req.URL.String(), len(reqChan))
+			defer func() {
+				<-reqChan
+				klog.Infof("%s request completed, left %d requests in flight", req.URL.String(), len(reqChan))
+			}()
+			handler.ServeHTTP(w, req)
+		default:
+			// Return a 429 status indicating "Too Many Requests"
+			klog.Errorf("Too many requests, please try again later, %s", req.URL.String())
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
 	})
 }

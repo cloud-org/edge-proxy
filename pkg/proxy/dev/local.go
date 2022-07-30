@@ -3,6 +3,7 @@ package dev
 import (
 	"fmt"
 	"net/http"
+	"sync"
 
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
@@ -13,6 +14,7 @@ type IsHealthy func() bool
 
 // LocalProxy is responsible for handling requests when remote servers are unhealthy
 type LocalProxy struct {
+	sync.RWMutex
 	cacheMgr  *CacheMgr
 	isHealthy IsHealthy
 }
@@ -61,6 +63,11 @@ func (lp *LocalProxy) localReqCache(w http.ResponseWriter, req *http.Request) er
 		return fmt.Errorf("not list consistency label")
 	}
 
+	if lp.GetCacheMgr() == nil {
+		klog.Errorf("cache mgr is nil")
+		return fmt.Errorf("get cache mgr err")
+	}
+
 	obj, err := lp.cacheMgr.QueryCache(info)
 	if err != nil {
 		klog.Errorf("查询缓存失败 err: %v", err)
@@ -76,4 +83,20 @@ func (lp *LocalProxy) localReqCache(w http.ResponseWriter, req *http.Request) er
 	}
 
 	return nil
+}
+
+func (lp *LocalProxy) GetCacheMgr() *CacheMgr {
+	lp.RLock()
+	defer lp.RUnlock()
+	return lp.cacheMgr
+}
+
+func (lp *LocalProxy) SetCacheMgr(cm *CacheMgr) {
+	lp.Lock()
+	defer lp.Unlock()
+	lp.cacheMgr = cm
+}
+
+func (lp *LocalProxy) IsHealthy() bool {
+	return true
 }
