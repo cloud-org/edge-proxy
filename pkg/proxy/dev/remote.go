@@ -8,7 +8,8 @@ import (
 	"net/url"
 	"strings"
 
-	yurthubutil "github.com/openyurtio/openyurt/pkg/yurthub/util"
+	"code.aliyun.com/openyurt/edge-proxy/pkg/util"
+
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	proxy2 "k8s.io/apimachinery/pkg/util/proxy"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -139,11 +140,11 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 		klog.Infof("request info is %+v\n", info)
 		// filter response data
 		if checkLabel(info, labelSelector, filterLabel) {
-			// todo: 重写 gzip reader 因为里面有对 component 进行获取
-			wrapBody, needUncompressed := yurthubutil.NewGZipReaderCloser(resp.Header, resp.Body, req, "filter")
+			// done: 重写 gzip reader 因为里面有对 component 进行获取
+			wrapBody, needUncompressed := util.NewGZipReaderCloser(resp.Header, resp.Body, info, "filter")
 			size, filterRc, err := NewFilterReadCloser(wrapBody, info.Resource, "skip-")
 			if err != nil {
-				klog.Errorf("failed to filter response for %s, %v", yurthubutil.ReqString(req), err)
+				klog.Errorf("failed to filter response for %s, %v", util.ReqInfoString(info), err)
 				return err
 			}
 			resp.Body = filterRc
@@ -170,8 +171,8 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 			checkLabel(info, labelSelector, consistencyLabel) {
 			// cache resp with storage interface
 			if rp.cacheMgr != nil && rp.cc.CanCache() {
-				rc, prc := yurthubutil.NewDualReadCloser(req, resp.Body, true)
-				wrapPrc, _ := yurthubutil.NewGZipReaderCloser(resp.Header, prc, req, "cache-manager")
+				rc, prc := util.NewDualReadCloser(req, resp.Body, true)
+				wrapPrc, _ := util.NewGZipReaderCloser(resp.Header, prc, info, "cache-manager")
 				go func(req *http.Request, prc io.ReadCloser) {
 					klog.Infof("cache consistency response")
 					err := rp.cacheMgr.CacheResponse(info, prc)

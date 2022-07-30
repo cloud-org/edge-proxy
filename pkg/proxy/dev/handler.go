@@ -5,14 +5,14 @@ import (
 	"io"
 	"net/http"
 
+	"code.aliyun.com/openyurt/edge-proxy/pkg/util"
+
 	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/types"
 
-	"github.com/openyurtio/openyurt/pkg/yurthub/util"
 	"k8s.io/klog/v2"
 
 	"code.aliyun.com/openyurt/edge-proxy/cmd/edge-proxy/app/config"
 	"code.aliyun.com/openyurt/edge-proxy/pkg/proxy"
-	yurthubutil "github.com/openyurtio/openyurt/pkg/yurthub/proxy/util"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -65,7 +65,7 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 
 // 增加中间件
 func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
-	handler = yurthubutil.WithRequestContentType(handler)
+	//handler = yurthubutil.WithRequestContentType(handler)
 	handler = d.printCreateReqBody(handler)
 
 	// inject request info

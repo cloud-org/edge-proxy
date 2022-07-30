@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/openyurtio/openyurt/pkg/yurthub/util"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
 )
@@ -34,40 +31,22 @@ func (lp *LocalProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	if reqInfo, ok := apirequest.RequestInfoFrom(ctx); ok && reqInfo != nil && reqInfo.IsResourceRequest {
 		switch reqInfo.Verb {
-		case "delete", "deletecollection":
-			err = localDelete(w, req)
+		//case "delete", "deletecollection":
+		//	err = localDelete(w, req)
 		default: // list., get, update
 			err = lp.localReqCache(w, req)
 		}
 
 		if err != nil {
-			klog.Errorf("could not proxy local for %s, %v", util.ReqString(req), err)
-			util.Err(err, w, req)
+			klog.Errorf("could not proxy local for %s %v", reqInfo.Resource, err)
+			//util.Err(err, w, req)
+			w.WriteHeader(http.StatusBadRequest)
 		}
 	} else {
-		klog.Errorf("request(%s) is not supported when cluster is unhealthy", util.ReqString(req))
-		util.Err(apierrors.NewBadRequest(fmt.Sprintf("request(%s) is not supported when cluster is unhealthy", util.ReqString(req))), w, req)
+		klog.Errorf("request(%s) is not supported when cluster is unhealthy", reqInfo.Resource)
+		//util.Err(apierrors.NewBadRequest(fmt.Sprintf("request(%s) is not supported when cluster is unhealthy", util.ReqString(req))), w, req)
+		w.WriteHeader(http.StatusForbidden)
 	}
-}
-
-// localDelete handles Delete requests when remote servers are unhealthy
-func localDelete(w http.ResponseWriter, req *http.Request) error {
-	ctx := req.Context()
-	info, _ := apirequest.RequestInfoFrom(ctx)
-	s := &metav1.Status{
-		Status: metav1.StatusFailure,
-		Code:   http.StatusForbidden,
-		Reason: metav1.StatusReasonForbidden,
-		Details: &metav1.StatusDetails{
-			Name:  info.Name,
-			Group: info.Namespace,
-			Kind:  info.Resource,
-		},
-		Message: "delete request is not supported in local cache",
-	}
-
-	util.WriteObject(http.StatusForbidden, s, w, req)
-	return nil
 }
 
 // localReqCache handles Get/List/Update requests when remote servers are unhealthy
