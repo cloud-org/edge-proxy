@@ -85,6 +85,7 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 	//handler = yurthubutil.WithRequestContentType(handler)
 	handler = d.printCreateReqBody(handler)
+	handler = d.countReq(handler)
 	//handler = d.WithMaxInFlightLimit(handler, 200) // 两百个并发
 
 	// inject request info
@@ -128,6 +129,20 @@ func (d *devFactory) printCreateReqBody(handler http.Handler) http.Handler {
 		}
 
 		handler.ServeHTTP(rw, req)
+	})
+}
+
+func (d *devFactory) countReq(handler http.Handler) http.Handler {
+	var count = 0
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+
+		labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
+		if strings.Contains(labelSelector, resourceLabel) {
+			count++
+			klog.Infof("resource usage count is %v", count)
+		}
+
+		handler.ServeHTTP(w, req)
 	})
 }
 
