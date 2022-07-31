@@ -28,7 +28,7 @@ func (r *Resourceusage) Prepare(ctx context.Context) error {
 	// start cpu profile
 	klog.Infof("prepare to start cpu profile")
 	go func() {
-		_, err := exec.Command("curl", "http://127.0.0.1:10267/debug/pprof/profile?seconds=60", "-o", "profile.txt").CombinedOutput()
+		_, err := exec.Command("wget", "http://127.0.0.1:10267/debug/pprof/profile?seconds=60", "-O", "profile.txt").CombinedOutput()
 		if err != nil {
 			klog.Errorf("cpu err: %v", err)
 			return
@@ -73,7 +73,7 @@ func (r *Resourceusage) benchmark_configmap(ctx context.Context) error {
 	timer := time.NewTimer(1 * time.Minute)
 	defer func() {
 		timer.Stop()
-		_, err := exec.Command("curl", "http://127.0.0.1:10267/debug/pprof/heap", "-o", "heap.txt").CombinedOutput()
+		_, err := exec.Command("wget", "http://127.0.0.1:10267/debug/pprof/heap", "-O", "heap.txt").CombinedOutput()
 		if err != nil {
 			klog.Errorf("heap err: %v", err)
 			return
