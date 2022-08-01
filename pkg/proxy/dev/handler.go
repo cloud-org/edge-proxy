@@ -1,10 +1,11 @@
 package dev
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/openyurtio/openyurt/pkg/yurthub/storage/factory"
 

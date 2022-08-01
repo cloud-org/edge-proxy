@@ -2,10 +2,11 @@ package dev
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
+
+	json "github.com/json-iterator/go"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"

@@ -1,11 +1,11 @@
 package dev
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
 
+	json "github.com/json-iterator/go"
 	"github.com/openyurtio/openyurt/pkg/yurthub/storage"
 	v1 "k8s.io/api/core/v1"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"

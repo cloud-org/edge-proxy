@@ -17,9 +17,10 @@ package benchmark
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"k8s.io/apimachinery/pkg/labels"
 
