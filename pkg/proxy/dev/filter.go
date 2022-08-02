@@ -77,7 +77,7 @@ func NewFilterReadCloser(rc io.ReadCloser, resource string, prefix string) (int,
 		sfrc.data = bytes.NewBuffer(marshalBytes)
 		return len(marshalBytes), sfrc, nil
 	default:
-		return 0, nil, fmt.Errorf("err resource type")
+		return 0, nil, fmt.Errorf("err resource type: %s", resource)
 	}
 
 }

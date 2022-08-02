@@ -86,7 +86,7 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 	//handler = yurthubutil.WithRequestContentType(handler)
 	handler = d.printCreateReqBody(handler)
-	handler = d.countReq(handler)
+	//handler = d.countReq(handler)
 	//handler = d.WithMaxInFlightLimit(handler, 200) // 两百个并发
 
 	// inject request info
