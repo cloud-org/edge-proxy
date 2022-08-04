@@ -3,7 +3,7 @@ package dev
 import (
 	"io"
 	"net/http"
-	"strings"
+	"sync"
 
 	json "github.com/json-iterator/go"
 
@@ -28,11 +28,13 @@ func init() {
 }
 
 type devFactory struct {
-	resolver     apirequest.RequestInfoResolver
-	loadBalancer LoadBalancer
-	localProxy   LoadBalancer
-	cc           *cacheChecker
-	cfg          *config.EdgeProxyConfiguration
+	resolver      apirequest.RequestInfoResolver
+	loadBalancer  LoadBalancer
+	localProxy    LoadBalancer
+	cc            *cacheChecker
+	cfg           *config.EdgeProxyConfiguration
+	cacheMgr      *CacheMgr
+	resourceCache bool
 }
 
 func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -52,6 +54,7 @@ func (d *devFactory) initCacheMgr() {
 		return
 	}
 	cacheMgr := NewCacheMgr(storageManager)
+	d.cacheMgr = cacheMgr
 	d.loadBalancer.SetCacheMgr(cacheMgr)
 	d.localProxy.SetCacheMgr(cacheMgr)
 	klog.Infof("set cache mgr")
@@ -79,20 +82,55 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 	// local proxy when lb is not healthy
 	d.localProxy = NewLocalProxy(nil, lb.IsHealthy)
 
+	d.cc.SetCanCache()
+	d.initCacheMgr()
+
 	return d.buildHandlerChain(d), nil
 }
 
 // 增加中间件
 func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 	//handler = yurthubutil.WithRequestContentType(handler)
-	handler = d.printCreateReqBody(handler)
-	//handler = d.countReq(handler)
+	//handler = d.printCreateReqBody(handler)
+	handler = d.returnCacheResourceUsage(handler)
+	handler = d.countReq(handler)
 	//handler = d.WithMaxInFlightLimit(handler, 200) // 两百个并发
 
 	// inject request info
 	handler = filters.WithRequestInfo(handler, d.resolver)
 
 	return handler
+}
+
+func (d *devFactory) returnCacheResourceUsage(handler http.Handler) http.Handler {
+
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		// if resource usage cache, then return, else continue
+		info, _ := apirequest.RequestInfoFrom(req.Context())
+		labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
+		if d.resourceCache && checkLabel(info, labelSelector, resourceLabel) {
+			klog.Infof("return resource cache")
+			res, err := d.cacheMgr.QueryCache(info, resourceType)
+			if err != nil {
+				klog.Errorf("query cache err: %v", err)
+				goto end
+			}
+
+			rw.Header().Set("Content-Type", "application/json")
+			rw.WriteHeader(http.StatusOK)
+			_, err = rw.Write(res)
+			if err != nil {
+				klog.Errorf("rw.Write err: %v", err)
+				goto end
+			}
+			// return if not err
+			return
+		}
+	end:
+
+		// no resource cache
+		handler.ServeHTTP(rw, req)
+	})
 }
 
 func (d *devFactory) printCreateReqBody(handler http.Handler) http.Handler {
@@ -135,41 +173,20 @@ func (d *devFactory) printCreateReqBody(handler http.Handler) http.Handler {
 
 func (d *devFactory) countReq(handler http.Handler) http.Handler {
 	var count = 0
+	var once sync.Once
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-
-		labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
-		if strings.Contains(labelSelector, resourceLabel) {
-			count++
-			klog.Infof("resource usage count is %v", count)
-		}
 
 		handler.ServeHTTP(w, req)
-	})
-}
 
-// WithMaxInFlightLimit limits the number of in-flight requests. and when in flight
-// requests exceeds the threshold, the following incoming requests will be rejected.
-func (d *devFactory) WithMaxInFlightLimit(handler http.Handler, limit int) http.Handler {
-	// 闭包，所以这里不会重复初始化
-	var reqChan chan bool
-	if limit > 0 {
-		reqChan = make(chan bool, limit)
-	}
-
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		select {
-		case reqChan <- true:
-			klog.Infof("start proxying: %s %s, in flight requests: %d", strings.ToLower(req.Method), req.URL.String(), len(reqChan))
-			defer func() {
-				<-reqChan
-				klog.Infof("%s request completed, left %d requests in flight", req.URL.String(), len(reqChan))
-			}()
-			handler.ServeHTTP(w, req)
-		default:
-			// Return a 429 status indicating "Too Many Requests"
-			klog.Errorf("Too many requests, please try again later, %s", req.URL.String())
-			w.WriteHeader(http.StatusTooManyRequests)
-			return
+		info, _ := apirequest.RequestInfoFrom(req.Context())
+		labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
+		if checkLabel(info, labelSelector, resourceLabel) {
+			count++
+			klog.Infof("resource usage count is %v", count)
+			once.Do(func() {
+				d.resourceCache = true
+				klog.Infof("set resource cache true")
+			})
 		}
 	})
 }

@@ -68,7 +68,7 @@ func (lp *LocalProxy) localReqCache(w http.ResponseWriter, req *http.Request) er
 		return fmt.Errorf("get cache mgr err")
 	}
 
-	obj, err := lp.cacheMgr.QueryCache(info)
+	obj, err := lp.cacheMgr.QueryCache(info, consistencyType)
 	if err != nil {
 		klog.Errorf("查询缓存失败 err: %v", err)
 		return err

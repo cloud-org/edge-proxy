@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"k8s.io/klog/v2"
+
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -78,7 +80,7 @@ type wrapHandler struct {
 }
 
 func (wrapHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	//klog.Infof("enter metrics")
+	klog.Infof("enter metrics")
 	promhttp.Handler().ServeHTTP(rw, req)
 }
 

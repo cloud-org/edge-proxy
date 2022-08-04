@@ -132,7 +132,7 @@ func NewResourceusage(ns string, proxyClient, client kubernetes.Interface) *Reso
 		ProxyClient: proxyClient,
 		Client:      client,
 		NameSpace:   ns,
-		Nums:        100,
+		Nums:        1000,
 		Labels: map[string]string{
 			"type":                    "resourceusage",
 			util.BENCH_MARK_LABEL_KEY: util.BENCH_MARK_LABEL_VALUE,

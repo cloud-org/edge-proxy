@@ -121,9 +121,10 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 
 	labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
 	// if test resource then return directly
-	if strings.Contains(labelSelector, resourceLabel) {
-		return nil
-	}
+	// you should cache if you need return resp not through proxy server
+	//if strings.Contains(labelSelector, resourceLabel) {
+	//	return nil
+	//}
 
 	// re-added transfer-encoding=chunked response header for watch request
 	info, exists := apirequest.RequestInfoFrom(ctx)
@@ -138,7 +139,7 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 	}
 
 	// 成功响应
-	if resp.StatusCode >= http.StatusOK && resp.StatusCode <= http.StatusPartialContent {
+	if resp.StatusCode >= http.StatusOK && resp.StatusCode <= http.StatusPartialContent && info.Verb == "list" {
 		klog.Infof("request info is %+v\n", info)
 		// filter response data
 		if checkLabel(info, labelSelector, filterLabel) {
@@ -167,23 +168,43 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 			return nil
 		}
 
-		// cache
-		if (info.IsResourceRequest && info.Verb == "list" &&
-			(info.Resource == "pods" || info.Resource == "configmaps") && labelSelector == "") ||
-			checkLabel(info, labelSelector, consistencyLabel) {
-			// cache resp with storage interface
-			if rp.GetCacheMgr() != nil && rp.cc.CanCache() {
+		if checkLabel(info, labelSelector, resourceLabel) {
+			if rp.GetCacheMgr() != nil && info.Namespace != "" {
 				rc, prc := util.NewDualReadCloser(req, resp.Body, true)
 				wrapPrc, _ := util.NewGZipReaderCloser(resp.Header, prc, info, "cache-manager")
 				go func(req *http.Request, prc io.ReadCloser) {
-					klog.Infof("cache consistency response")
-					err := rp.cacheMgr.CacheResponse(info, prc)
+					klog.Infof("cache resourceusage response")
+					err := rp.cacheMgr.CacheResponse(info, prc, resourceType)
 					if err != nil {
 						klog.Errorf("%s response cache ended with error, %v", info.Resource, err)
 					}
 				}(req, wrapPrc)
 
 				resp.Body = rc
+				// return directly
+				return nil
+			}
+		}
+
+		// cache
+		if (info.IsResourceRequest && info.Verb == "list" &&
+			(info.Resource == "pods" || info.Resource == "configmaps") && labelSelector == "") ||
+			checkLabel(info, labelSelector, consistencyLabel) {
+			// cache resp with storage interface
+			if rp.GetCacheMgr() != nil && rp.cc.CanCache() && info.Namespace != "" {
+				rc, prc := util.NewDualReadCloser(req, resp.Body, true)
+				wrapPrc, _ := util.NewGZipReaderCloser(resp.Header, prc, info, "cache-manager")
+				go func(req *http.Request, prc io.ReadCloser) {
+					klog.Infof("cache consistency response")
+					err := rp.cacheMgr.CacheResponse(info, prc, consistencyType)
+					if err != nil {
+						klog.Errorf("%s response cache ended with error, %v", info.Resource, err)
+					}
+				}(req, wrapPrc)
+
+				resp.Body = rc
+				// return directly
+				return nil
 			}
 		}
 
