@@ -9,11 +9,6 @@ import (
 
 	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/config"
 	"github.com/imroc/req/v3"
-	"github.com/openyurtio/openyurt/pkg/yurthub/cachemanager"
-	"github.com/openyurtio/openyurt/pkg/yurthub/kubernetes/meta"
-	"github.com/openyurtio/openyurt/pkg/yurthub/kubernetes/serializer"
-	"github.com/openyurtio/openyurt/pkg/yurthub/storage/factory"
-
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
@@ -23,9 +18,6 @@ import (
 
 // EdgeProxyConfiguration represents configuration of edge proxy
 type EdgeProxyConfiguration struct {
-	SerializerManager   *serializer.SerializerManager
-	StorageWrapper      cachemanager.StorageWrapper
-	RESTMapperManager   *meta.RESTMapperManager
 	RT                  http.RoundTripper
 	RemoteServers       []*url.URL
 	DiskCachePath       string
@@ -42,27 +34,13 @@ func Complete(options *options.EdgeProxyOptions) (*EdgeProxyConfiguration, error
 		return nil, err
 	}
 
-	// 应该序列化到磁盘的时候使用
-	serializerManager := serializer.NewSerializerManager()
 	// 获取 roundTripper 表示执行单个HTTP事务的能力，获得给定请求的响应
 	rt, err := prepareRoundTripper(options.UseKubeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("could not new round tripper, %w", err)
 	}
 
-	// create disk storage
-	storageManager, err := factory.CreateStorage(options.DiskCachePath)
-	if err != nil {
-		klog.Errorf("could not create storage manager, %v", err)
-		return nil, err
-	}
-	storageWrapper := cachemanager.NewStorageWrapper(storageManager)
-	restMapperManager := meta.NewRESTMapperManager(storageManager)
-
 	cfg := &EdgeProxyConfiguration{
-		SerializerManager:   serializerManager,
-		StorageWrapper:      storageWrapper,
-		RESTMapperManager:   restMapperManager,
 		RT:                  rt,
 		RemoteServers:       us,
 		DiskCachePath:       options.DiskCachePath,

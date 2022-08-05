@@ -2,78 +2,15 @@ package dev
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"strings"
 
-	"github.com/openyurtio/openyurt/pkg/yurthub/kubernetes/serializer"
+	json "github.com/json-iterator/go"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/klog/v2"
 )
-
-type skipListFilter struct {
-	resource   string // pod or configmap
-	prefix     string // 目前默认为: skip-
-	serializer *serializer.Serializer
-}
-
-func NewSkipListFilter(resource string, serializer *serializer.Serializer, prefix string) *skipListFilter {
-	return &skipListFilter{
-		resource:   resource,
-		prefix:     prefix,
-		serializer: serializer,
-	}
-}
-
-// ObjectResponseFilter filter the endpoints from get response object and return the bytes
-func (sf *skipListFilter) ObjectResponseFilter(b []byte) ([]byte, error) {
-	eps, err := sf.serializer.Decode(b)
-	if err != nil || eps == nil {
-		klog.Errorf("skip filter, failed to decode response in ObjectResponseFilter of endpointsFilterHandler, %v", err)
-		return b, nil
-	}
-
-	switch sf.resource {
-	case "pods":
-		podList, ok := eps.(*v1.PodList)
-		if !ok {
-			klog.Errorf("*v1.PodList 断言失败")
-			return b, nil
-		}
-		var items []v1.Pod
-		for i := 0; i < len(podList.Items); i++ {
-			if !strings.HasPrefix(podList.Items[i].Name, sf.prefix) {
-				items = append(items, podList.Items[i])
-			}
-		}
-		podList.Items = items
-		return sf.serializer.Encode(podList)
-	case "configmaps":
-		configMapList, ok := eps.(*v1.ConfigMapList)
-		if !ok {
-			klog.Errorf("*v1.ConfigMapList 断言失败")
-			return b, nil
-		}
-		var items []v1.ConfigMap
-		for i := 0; i < len(configMapList.Items); i++ {
-			if !strings.HasPrefix(configMapList.Items[i].Name, sf.prefix) {
-				items = append(items, configMapList.Items[i])
-			}
-		}
-		configMapList.Items = items
-		return sf.serializer.Encode(configMapList)
-	default:
-		klog.Infof("未知的 resource: %v, 不进行过滤", sf.resource)
-		return b, nil
-	}
-}
-
-// todo: 暂时不实现
-// FilterWatchObject filter the endpoints from watch response object and return the bytes
-func (sf *skipListFilter) StreamResponseFilter(rc io.ReadCloser, ch chan watch.Event) error {
-	return nil
-}
 
 type skipListFilterReadCloser struct {
 	data *bytes.Buffer
@@ -90,20 +27,57 @@ func (s *skipListFilterReadCloser) Close() error {
 	return s.rc.Close()
 }
 
-func NewFilterReadCloser(rc io.ReadCloser, sf *skipListFilter) (int, io.ReadCloser, error) {
+func NewFilterReadCloser(rc io.ReadCloser, resource string, prefix string) (int, io.ReadCloser, error) {
 	sfrc := &skipListFilterReadCloser{
 		data: new(bytes.Buffer),
 		rc:   rc,
 	}
 
-	var newData []byte
-	n, err := sfrc.data.ReadFrom(rc)
-	if err != nil {
-		return int(n), sfrc, err
+	switch resource {
+	case "pods":
+		var podList v1.PodList
+		err := json.NewDecoder(rc).Decode(&podList)
+		if err != nil {
+			klog.Errorf("%s decode err: %v", resource, err)
+			return 0, nil, err
+		}
+		var items []v1.Pod
+		for i := 0; i < len(podList.Items); i++ {
+			if !strings.HasPrefix(podList.Items[i].Name, prefix) {
+				items = append(items, podList.Items[i])
+			}
+		}
+		podList.Items = items
+		marshalBytes, err := json.Marshal(podList)
+		if err != nil {
+			klog.Errorf("%s marshal err: %v", resource, err)
+			return 0, nil, err
+		}
+		sfrc.data = bytes.NewBuffer(marshalBytes)
+		return len(marshalBytes), sfrc, nil
+	case "configmaps":
+		var configmaps v1.ConfigMapList
+		err := json.NewDecoder(rc).Decode(&configmaps)
+		if err != nil {
+			klog.Errorf("%s decode err: %v", resource, err)
+			return 0, nil, err
+		}
+		var items []v1.ConfigMap
+		for i := 0; i < len(configmaps.Items); i++ {
+			if !strings.HasPrefix(configmaps.Items[i].Name, prefix) {
+				items = append(items, configmaps.Items[i])
+			}
+		}
+		configmaps.Items = items
+		marshalBytes, err := json.Marshal(configmaps)
+		if err != nil {
+			klog.Errorf("%s marshal err: %v", resource, err)
+			return 0, nil, err
+		}
+		sfrc.data = bytes.NewBuffer(marshalBytes)
+		return len(marshalBytes), sfrc, nil
+	default:
+		return 0, nil, fmt.Errorf("err resource type: %s", resource)
 	}
 
-	newData, err = sf.ObjectResponseFilter(sfrc.data.Bytes())
-	sfrc.data = bytes.NewBuffer(newData)
-
-	return len(newData), sfrc, err
 }
