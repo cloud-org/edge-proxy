@@ -1,6 +1,7 @@
 package dev
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -25,60 +26,20 @@ func NewCacheMgr(s storage.Store) *CacheMgr {
 }
 
 func (c *CacheMgr) CacheResponseMem(info *apirequest.RequestInfo, prc io.ReadCloser, labelType string) error {
-	switch info.Resource {
-	case "pods":
-		var podList v1.PodList
-		err := json.NewDecoder(prc).Decode(&podList)
-		if err != nil {
-			klog.Errorf("%s decode err: %v", info.Resource, err)
-			return err
-		}
-		var items []v1.Pod
-		for i := 0; i < len(podList.Items); i++ {
-			if podList.Items[i].Labels["type"] == labelType {
-				//klog.Infof("add item %s", podList.Items[i].Name)
-				items = append(items, podList.Items[i])
-			}
-		}
-		podList.Items = items
-		marshalBytes, err := json.Marshal(podList)
-		if err != nil {
-			klog.Errorf("%s marshal err: %v", info.Resource, err)
-			return err
-		}
-		key := KeyFunc(info.Resource, info.Namespace, labelType)
+	key := KeyFunc(info.Resource, info.Namespace, labelType)
 
-		c.memdata[key] = marshalBytes
-
-		klog.Infof("%s memdata create ok", info.Resource)
-	case "configmaps":
-		var configmaps v1.ConfigMapList
-		err := json.NewDecoder(prc).Decode(&configmaps)
-		if err != nil {
-			klog.Errorf("%s decode err: %v", info.Resource, err)
-			return err
-		}
-		var items []v1.ConfigMap
-		for i := 0; i < len(configmaps.Items); i++ {
-			if configmaps.Items[i].Labels["type"] == labelType {
-				//klog.Infof("add item %s", configmaps.Items[i].Name)
-				items = append(items, configmaps.Items[i])
-			}
-		}
-		configmaps.Items = items
-		marshalBytes, err := json.Marshal(configmaps)
-		if err != nil {
-			klog.Errorf("%s marshal err: %v", info.Resource, err)
-			return err
-		}
-		key := KeyFunc(info.Resource, info.Namespace, labelType)
-
-		c.memdata[key] = marshalBytes
-
-		klog.Infof("%s memdata create ok", info.Resource)
-	default:
-		return fmt.Errorf("err resource type: %s", info.Resource)
+	//p := new(bytes.Buffer)
+	p := bytes.NewBuffer(make([]byte, 0, 500*1024))
+	_, err := p.ReadFrom(prc)
+	if err != nil {
+		klog.Errorf("read prc err: %v", err)
+		return err
 	}
+
+	data := p.Bytes()
+	c.memdata[key] = data
+
+	klog.Infof("%s memdata create ok, data.len: %v", info.Resource, len(data))
 
 	return nil
 }
