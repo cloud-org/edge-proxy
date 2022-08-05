@@ -93,7 +93,7 @@ func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 	//handler = yurthubutil.WithRequestContentType(handler)
 	//handler = d.printCreateReqBody(handler)
 	handler = d.returnCacheResourceUsage(handler)
-	handler = d.countReq(handler)
+	//handler = d.countReq(handler)
 	//handler = d.WithMaxInFlightLimit(handler, 200) // 两百个并发
 
 	// inject request info
@@ -103,22 +103,25 @@ func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 }
 
 func (d *devFactory) returnCacheResourceUsage(handler http.Handler) http.Handler {
+	var count int
 
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		// if resource usage cache, then return, else continue
 		info, _ := apirequest.RequestInfoFrom(req.Context())
 		labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
 		if d.resourceCache && checkLabel(info, labelSelector, resourceLabel) {
-			klog.Infof("return resource cache")
-			res, err := d.cacheMgr.QueryCache(info, resourceType)
-			if err != nil {
-				klog.Errorf("query cache err: %v", err)
+			//klog.Infof("return resource cache")
+			count++
+			klog.Infof("resource usage count is %v", count)
+			res, ok := d.cacheMgr.QueryCacheMem(info, resourceType)
+			if !ok {
+				klog.Errorf("may be not resource cache")
 				goto end
 			}
 
 			rw.Header().Set("Content-Type", "application/json")
 			rw.WriteHeader(http.StatusOK)
-			_, err = rw.Write(res)
+			_, err := rw.Write(res)
 			if err != nil {
 				klog.Errorf("rw.Write err: %v", err)
 				goto end
@@ -130,6 +133,11 @@ func (d *devFactory) returnCacheResourceUsage(handler http.Handler) http.Handler
 
 		// no resource cache
 		handler.ServeHTTP(rw, req)
+		if checkLabel(info, labelSelector, resourceLabel) {
+			d.resourceCache = true // set cache true
+			count++
+			klog.Infof("resource usage count is %v", count)
+		}
 	})
 }
 
