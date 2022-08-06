@@ -11,29 +11,19 @@ import (
 
 	"code.aliyun.com/openyurt/edge-proxy/pkg/util"
 
-	"k8s.io/apimachinery/pkg/util/httpstream"
-	proxy2 "k8s.io/apimachinery/pkg/util/proxy"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
 )
 
-type responder struct{}
-
-func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
-	klog.Errorf("failed while proxying request %s, %v", req.URL, err)
-	http.Error(w, err.Error(), http.StatusInternalServerError)
-}
-
 type RemoteProxy struct {
 	sync.RWMutex
-	remoteServer        *url.URL
-	reverseProxy        *httputil.ReverseProxy
-	currentTransport    http.RoundTripper
-	upgradeAwareHandler *proxy2.UpgradeAwareHandler
-	cacheMgr            *CacheMgr
-	stopCh              <-chan struct{}
-	checker             *checker
-	cc                  *cacheChecker
+	remoteServer     *url.URL
+	reverseProxy     *httputil.ReverseProxy
+	currentTransport http.RoundTripper
+	cacheMgr         *CacheMgr
+	stopCh           <-chan struct{}
+	checker          *checker
+	cc               *cacheChecker
 }
 
 // NewRemoteProxy 参数之后接着补充
@@ -56,18 +46,6 @@ func NewRemoteProxy(
 	rproxy.checker = NewChecker(remoteServer)
 	rproxy.checker.start(rproxy.stopCh) // start checker
 
-	// todo: websocket 处理 可以实际测试下
-	upgradeAwareHandler := proxy2.NewUpgradeAwareHandler(
-		remoteServer,
-		rproxy.currentTransport,
-		false,
-		true,
-		&responder{},
-	)
-	upgradeAwareHandler.UseRequestLocation = true
-
-	rproxy.upgradeAwareHandler = upgradeAwareHandler
-
 	// 初始化反向代理
 	rproxy.reverseProxy = httputil.NewSingleHostReverseProxy(rproxy.remoteServer)
 
@@ -80,13 +58,6 @@ func NewRemoteProxy(
 }
 
 func (rp *RemoteProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	// todo: remove
-	if httpstream.IsUpgradeRequest(req) {
-		klog.Infof("get upgrade request %s", req.URL)
-		rp.upgradeAwareHandler.ServeHTTP(rw, req)
-		return
-	}
-
 	rp.reverseProxy.ServeHTTP(rw, req)
 }
 
@@ -140,7 +111,7 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 
 	// 成功响应
 	if resp.StatusCode >= http.StatusOK && resp.StatusCode <= http.StatusPartialContent && info.Verb == "list" {
-		klog.Infof("request info is %+v\n", info)
+		//klog.Infof("request info is %+v\n", info)
 		// filter response data
 		if checkLabel(info, labelSelector, filterLabel) {
 			// done: 重写 gzip reader 因为里面有对 component 进行获取

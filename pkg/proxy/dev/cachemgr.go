@@ -29,7 +29,7 @@ func (c *CacheMgr) CacheResponseMem(info *apirequest.RequestInfo, prc io.ReadClo
 	key := KeyFunc(info.Resource, info.Namespace, labelType)
 
 	//p := new(bytes.Buffer)
-	p := bytes.NewBuffer(make([]byte, 0, 500*1024))
+	p := bytes.NewBuffer(make([]byte, 0, 100*1024)) // data.len: 1123875 线上测评数据
 	_, err := p.ReadFrom(prc)
 	if err != nil {
 		klog.Errorf("read prc err: %v", err)
