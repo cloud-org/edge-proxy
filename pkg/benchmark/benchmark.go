@@ -130,12 +130,31 @@ func NewBenchMark(deps *options.BenchMarkOptions) (*BenchMark, error) {
 		Namespace:            deps.Namespace,
 	}
 
-	b.SubBenchMarkers = append(b.SubBenchMarkers,
-		NewFunctional(b.Namespace, proxycs, cs, b.ProxyConfigMapLister, b.ConfigMapLister),
-		NewFilter(b.Namespace, proxycs, cs),
-		NewResourceusage(b.Namespace, proxycs, cs),
-		NewConsistency(b.Namespace, proxycs, cs),
-	)
+	switch deps.BenchType {
+	case "all":
+		b.SubBenchMarkers = append(b.SubBenchMarkers,
+			NewFunctional(b.Namespace, proxycs, cs, b.ProxyConfigMapLister, b.ConfigMapLister),
+			NewFilter(b.Namespace, proxycs, cs),
+			NewResourceusage(b.Namespace, proxycs, cs),
+			NewConsistency(b.Namespace, proxycs, cs),
+		)
+	case "filter":
+		b.SubBenchMarkers = append(b.SubBenchMarkers,
+			NewFilter(b.Namespace, proxycs, cs),
+		)
+	case "func":
+		b.SubBenchMarkers = append(b.SubBenchMarkers,
+			NewFunctional(b.Namespace, proxycs, cs, b.ProxyConfigMapLister, b.ConfigMapLister),
+		)
+	case "consistency":
+		b.SubBenchMarkers = append(b.SubBenchMarkers,
+			NewConsistency(b.Namespace, proxycs, cs),
+		)
+	case "resource":
+		b.SubBenchMarkers = append(b.SubBenchMarkers,
+			NewResourceusage(b.Namespace, proxycs, cs),
+		)
+	}
 
 	return b, nil
 }
