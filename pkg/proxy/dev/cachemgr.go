@@ -50,8 +50,8 @@ func (c *CacheMgr) CacheResponseMem(info *apirequest.RequestInfo, prc io.ReadClo
 	//p := new(bytes.Buffer)
 	//p := bytes.NewBuffer(make([]byte, 0, 100*1024)) // data.len: 1123875 线上测评数据
 	//_, err := p.ReadFrom(prc)
-	data, err := io.ReadAll(prc)
-	//data, err := ReadAll(prc)
+	//data, err := io.ReadAll(prc)
+	data, err := ReadAll(prc)
 	if err != nil {
 		klog.Errorf("read prc err: %v", err)
 		return err
