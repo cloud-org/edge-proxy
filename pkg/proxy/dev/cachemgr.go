@@ -1,7 +1,6 @@
 package dev
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -25,21 +24,43 @@ func NewCacheMgr(s storage.Store) *CacheMgr {
 	}
 }
 
+// ReadAll tag: v0.0.26 有打包使用 score: 130241.5284
+func ReadAll(r io.Reader) ([]byte, error) {
+	//b := make([]byte, 0, 532874)
+	b := make([]byte, 0, 1123876) // data.len: 1123875 线上测评数据
+	for {
+		if len(b) == cap(b) {
+			// Add more capacity (let append pick how much).
+			b = append(b, 0)[:len(b)]
+		}
+		n, err := r.Read(b[len(b):cap(b)])
+		b = b[:len(b)+n]
+		if err != nil {
+			if err == io.EOF {
+				err = nil
+			}
+			return b, err
+		}
+	}
+}
+
 func (c *CacheMgr) CacheResponseMem(info *apirequest.RequestInfo, prc io.ReadCloser, labelType string) error {
 	key := KeyFunc(info.Resource, info.Namespace, labelType)
 
 	//p := new(bytes.Buffer)
-	p := bytes.NewBuffer(make([]byte, 0, 100*1024)) // data.len: 1123875 线上测评数据
-	_, err := p.ReadFrom(prc)
+	//p := bytes.NewBuffer(make([]byte, 0, 100*1024)) // data.len: 1123875 线上测评数据
+	//_, err := p.ReadFrom(prc)
+	data, err := io.ReadAll(prc)
+	//data, err := ReadAll(prc)
 	if err != nil {
 		klog.Errorf("read prc err: %v", err)
 		return err
 	}
 
-	data := p.Bytes()
+	//data := p.Bytes()
 	c.memdata[key] = data
 
-	klog.Infof("%s memdata create ok, data.len: %v", info.Resource, len(data))
+	klog.Infof("%s memdata create ok, data.len: %v, data.cap: %v", info.Resource, len(data), cap(data))
 
 	return nil
 }
