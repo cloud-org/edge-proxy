@@ -2,7 +2,9 @@ package dev
 
 import (
 	"bytes"
+	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 )
@@ -51,4 +53,9 @@ func TestIoReadAll(t *testing.T) {
 		return
 	}
 	t.Logf("p.len: %v, data: %v, data.cap: %v\n", len(data), string(data), cap(data)) // data.cap: 512
+}
+
+func TestFprintf(t *testing.T) {
+	t.Log(64 << 10)
+	fmt.Fprint(os.Stdout, "hello")
 }

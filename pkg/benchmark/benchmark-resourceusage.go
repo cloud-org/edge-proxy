@@ -83,10 +83,11 @@ func (r *Resourceusage) benchmark_configmap(ctx context.Context) error {
 	}()
 	klog.Infof("prepare to start heap profile")
 
+	count := 0
 	for {
 		select {
 		case <-timer.C:
-			klog.Infof("list resource usage ok")
+			klog.Infof("list resource usage ok, count is %v", count)
 			return nil
 		default:
 			// list cms
@@ -97,6 +98,7 @@ func (r *Resourceusage) benchmark_configmap(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
+			count++
 			if len(r.PrepareConfigmaps) != len(cms.Items) {
 				klog.Errorf(
 					"Inconsistent data returned, prepare len %d get len %d",

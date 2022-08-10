@@ -7,7 +7,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/gorilla/mux"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	//"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"code.aliyun.com/openyurt/edge-proxy/cmd/edge-proxy/app/config"
 	"code.aliyun.com/openyurt/edge-proxy/pkg/profile"
@@ -73,19 +73,20 @@ func registerHandlers(c *mux.Router) {
 	profile.Install(c)
 
 	// register handler for metrics
-	c.Handle("/metrics", &wrapHandler{})
+	//c.Handle("/metrics", &wrapHandler{})
 }
 
-type wrapHandler struct {
-}
-
-func (wrapHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	klog.Infof("enter metrics")
-	promhttp.Handler().ServeHTTP(rw, req)
-}
+//type wrapHandler struct {
+//}
+//
+//func (wrapHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+//	klog.Infof("enter metrics")
+//	promhttp.Handler().ServeHTTP(rw, req)
+//}
 
 // healthz returns ok for healthz request
 func healthz(w http.ResponseWriter, _ *http.Request) {
+	klog.Infof("enter healthz")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "OK")
 }
