@@ -2,10 +2,9 @@ package dev
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/openyurtio/openyurt/pkg/yurthub/storage/factory"
-	"k8s.io/apiserver/pkg/endpoints/filters"
-
 	"k8s.io/klog/v2"
 
 	"code.aliyun.com/openyurt/edge-proxy/cmd/edge-proxy/app/config"
@@ -26,6 +25,7 @@ type devFactory struct {
 	cfg           *config.EdgeProxyConfiguration
 	cacheMgr      *CacheMgr
 	resourceCache bool
+	resourceNs    string
 }
 
 func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -84,7 +84,7 @@ func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 	//handler = d.WithMaxInFlightLimit(handler, 200) // 两百个并发
 
 	// inject request info
-	handler = filters.WithRequestInfo(handler, d.resolver)
+	//handler = filters.WithRequestInfo(handler, d.resolver)
 
 	return handler
 }
@@ -94,13 +94,12 @@ func (d *devFactory) returnCacheResourceUsage(handler http.Handler) http.Handler
 
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		// if resource usage cache, then return, else continue
-		info, _ := apirequest.RequestInfoFrom(req.Context())
 		labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
-		if d.resourceCache && checkLabel(info, labelSelector, resourceLabel) {
+		if d.resourceCache && strings.Contains(labelSelector, resourceLabel) {
 			//klog.Infof("return resource cache")
 			count++
 			klog.Infof("resource usage count is %v", count)
-			res, ok := d.cacheMgr.QueryCacheMem(info, resourceType)
+			res, ok := d.cacheMgr.QueryCacheMem("configmaps", d.resourceNs, resourceType)
 			if !ok {
 				klog.Errorf("may be not resource cache")
 				goto end
@@ -118,12 +117,20 @@ func (d *devFactory) returnCacheResourceUsage(handler http.Handler) http.Handler
 		}
 	end:
 
+		info, err := d.resolver.NewRequestInfo(req)
+		if err != nil {
+			klog.Errorf("resolver request info err: %v", err)
+			return
+		}
+		// inject info
+		req = req.WithContext(apirequest.WithRequestInfo(req.Context(), info))
 		// no resource cache
 		handler.ServeHTTP(rw, req)
 		if checkLabel(info, labelSelector, resourceLabel) {
-			d.resourceCache = true // set cache true
+			d.resourceCache = true        // set cache true
+			d.resourceNs = info.Namespace // set ns
 			count++
-			klog.Infof("resource usage count is %v", count)
+			klog.Infof("first resource usage count is %v", count)
 		}
 	})
 }

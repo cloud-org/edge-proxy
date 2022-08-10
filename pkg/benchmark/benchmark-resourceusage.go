@@ -26,16 +26,6 @@ type Resourceusage struct {
 
 func (r *Resourceusage) Prepare(ctx context.Context) error {
 	// start cpu profile
-	klog.Infof("prepare to start cpu profile")
-	go func() {
-		_, err := exec.Command("wget", "http://127.0.0.1:10267/debug/pprof/profile?seconds=60", "-O", "profile.txt").CombinedOutput()
-		if err != nil {
-			klog.Errorf("cpu err: %v", err)
-			return
-		}
-		//klog.Infof("data is %v", data)
-		return
-	}()
 	for i := 0; i < r.Nums; i++ {
 
 		cm := &v1.ConfigMap{
@@ -69,10 +59,21 @@ func (r *Resourceusage) BenchMark(ctx context.Context) error {
 }
 
 func (r *Resourceusage) benchmark_configmap(ctx context.Context) error {
-	// start heap pprof for 1m
-	timer := time.NewTimer(1 * time.Minute)
+	// start heap pprof for 3m
+	timer := time.NewTimer(3 * time.Minute)
+	go func() {
+		klog.Infof("prepare to start cpu profile")
+		_, err := exec.Command("wget", "http://127.0.0.1:10267/debug/pprof/profile?seconds=180", "-O", "profile.txt").CombinedOutput()
+		if err != nil {
+			klog.Errorf("cpu err: %v", err)
+			return
+		}
+		//klog.Infof("data is %v", data)
+		return
+	}()
 	defer func() {
 		timer.Stop()
+		klog.Infof("prepare to start heap profile")
 		_, err := exec.Command("wget", "http://127.0.0.1:10267/debug/pprof/heap", "-O", "heap.txt").CombinedOutput()
 		if err != nil {
 			klog.Errorf("heap err: %v", err)
@@ -81,7 +82,6 @@ func (r *Resourceusage) benchmark_configmap(ctx context.Context) error {
 		//klog.Infof("data is %v", data)
 		return
 	}()
-	klog.Infof("prepare to start heap profile")
 
 	count := 0
 	for {
