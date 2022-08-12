@@ -38,6 +38,7 @@ func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	d.localProxy.ServeHTTP(rw, req)
 }
 
+//initCacheMgr init cache mgr
 func (d *devFactory) initCacheMgr() (*CacheMgr, error) {
 	storageManager, err := factory.CreateStorage(d.cfg.DiskCachePath)
 	if err != nil {
@@ -75,7 +76,7 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 	return d.buildHandlerChain(d), nil
 }
 
-// 增加中间件
+// buildHandlerChain use middleware
 func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 	//handler = yurthubutil.WithRequestContentType(handler)
 	//handler = d.printCreateReqBody(handler)
@@ -89,6 +90,7 @@ func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 	return handler
 }
 
+//returnCacheResourceUsage if labelSelector contains type=resourceusage, then return mem data if ok
 func (d *devFactory) returnCacheResourceUsage(handler http.Handler) http.Handler {
 	var count int
 

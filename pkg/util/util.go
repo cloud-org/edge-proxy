@@ -21,23 +21,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
 
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
 )
-
-// ReqString formats a string for request
-func ReqString(req *http.Request) string {
-	ctx := req.Context()
-	if info, ok := apirequest.RequestInfoFrom(ctx); ok {
-		return fmt.Sprintf("%s %s: %s", info.Verb, info.Resource, req.URL.String())
-	}
-
-	return fmt.Sprintf("%s", req.URL.String())
-}
 
 // ReqInfoString formats a string for request info
 func ReqInfoString(info *apirequest.RequestInfo) string {
@@ -104,52 +91,6 @@ func (dr *dualReadCloser) Close() error {
 	}
 
 	return nil
-}
-
-// KeyFunc combine comp resource ns name into a key
-func KeyFunc(comp, resource, ns, name string) (string, error) {
-	if comp == "" || resource == "" {
-		return "", fmt.Errorf("createKey: comp, resource can not be empty")
-	}
-
-	return filepath.Join(comp, resource, ns, name), nil
-}
-
-// SplitKey split key into comp, resource, ns, name
-func SplitKey(key string) (comp, resource, ns, name string) {
-	if len(key) == 0 {
-		return
-	}
-
-	parts := strings.Split(key, "/")
-	switch len(parts) {
-	case 1:
-		comp = parts[0]
-	case 2:
-		comp = parts[0]
-		resource = parts[1]
-	case 3:
-		comp = parts[0]
-		resource = parts[1]
-		name = parts[2]
-	case 4:
-		comp = parts[0]
-		resource = parts[1]
-		ns = parts[2]
-		name = parts[3]
-	}
-
-	return
-}
-
-// FileExists checks if specified file exists.
-func FileExists(filename string) (bool, error) {
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-	return true, nil
 }
 
 // gzipReaderCloser will gunzip the data if response header

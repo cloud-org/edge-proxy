@@ -41,12 +41,10 @@ func (lp *LocalProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		if err != nil {
 			klog.Errorf("could not proxy local for %s %v", reqInfo.Resource, err)
-			//util.Err(err, w, req)
 			w.WriteHeader(http.StatusBadRequest)
 		}
 	} else {
 		klog.Errorf("request(%s) is not supported when cluster is unhealthy", reqInfo.Resource)
-		//util.Err(apierrors.NewBadRequest(fmt.Sprintf("request(%s) is not supported when cluster is unhealthy", util.ReqString(req))), w, req)
 		w.WriteHeader(http.StatusForbidden)
 	}
 }
@@ -85,6 +83,7 @@ func (lp *LocalProxy) localReqCache(w http.ResponseWriter, req *http.Request) er
 	return nil
 }
 
+// IsHealthy always return true
 func (lp *LocalProxy) IsHealthy() bool {
 	return true
 }
