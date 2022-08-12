@@ -7,7 +7,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
-	"sync"
 
 	"code.aliyun.com/openyurt/edge-proxy/pkg/util"
 
@@ -16,14 +15,12 @@ import (
 )
 
 type RemoteProxy struct {
-	sync.RWMutex
 	remoteServer     *url.URL
 	reverseProxy     *httputil.ReverseProxy
 	currentTransport http.RoundTripper
 	cacheMgr         *CacheMgr
 	stopCh           <-chan struct{}
 	checker          *checker
-	cc               *cacheChecker
 }
 
 // NewRemoteProxy 参数之后接着补充
@@ -31,7 +28,6 @@ func NewRemoteProxy(
 	remoteServer *url.URL,
 	cacheMgr *CacheMgr,
 	transport http.RoundTripper,
-	cc *cacheChecker,
 	stopCh <-chan struct{},
 ) (*RemoteProxy, error) {
 
@@ -39,7 +35,6 @@ func NewRemoteProxy(
 		remoteServer:     remoteServer,
 		currentTransport: transport,
 		cacheMgr:         cacheMgr,
-		cc:               cc,
 		stopCh:           stopCh,
 	}
 
@@ -140,7 +135,7 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 		}
 
 		if checkLabel(info, labelSelector, resourceLabel) {
-			if rp.GetCacheMgr() != nil && info.Namespace != "" {
+			if rp.cacheMgr != nil && info.Namespace != "" {
 				rc, prc := util.NewDualReadCloser(req, resp.Body, true)
 				wrapPrc, _ := util.NewGZipReaderCloser(resp.Header, prc, info, "cache-manager")
 				go func(req *http.Request, prc io.ReadCloser) {
@@ -162,7 +157,7 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 			(info.Resource == "pods" || info.Resource == "configmaps") && labelSelector == "") ||
 			checkLabel(info, labelSelector, consistencyLabel) {
 			// cache resp with storage interface
-			if rp.GetCacheMgr() != nil && rp.cc.CanCache() && info.Namespace != "" {
+			if rp.cacheMgr != nil && info.Namespace != "" {
 				rc, prc := util.NewDualReadCloser(req, resp.Body, true)
 				wrapPrc, _ := util.NewGZipReaderCloser(resp.Header, prc, info, "cache-manager")
 				go func(req *http.Request, prc io.ReadCloser) {
@@ -192,16 +187,4 @@ func checkLabel(info *apirequest.RequestInfo, selector string, label string) boo
 	}
 
 	return false
-}
-
-func (rp *RemoteProxy) SetCacheMgr(cm *CacheMgr) {
-	rp.Lock()
-	defer rp.Unlock()
-	rp.cacheMgr = cm
-}
-
-func (rp *RemoteProxy) GetCacheMgr() *CacheMgr {
-	rp.RLock()
-	defer rp.RUnlock()
-	return rp.cacheMgr
 }

@@ -63,7 +63,7 @@ func (lp *LocalProxy) localReqCache(w http.ResponseWriter, req *http.Request) er
 		return fmt.Errorf("not list consistency label")
 	}
 
-	if lp.GetCacheMgr() == nil {
+	if lp.cacheMgr == nil {
 		klog.Errorf("cache mgr is nil")
 		return fmt.Errorf("get cache mgr err")
 	}
@@ -83,18 +83,6 @@ func (lp *LocalProxy) localReqCache(w http.ResponseWriter, req *http.Request) er
 	}
 
 	return nil
-}
-
-func (lp *LocalProxy) GetCacheMgr() *CacheMgr {
-	lp.RLock()
-	defer lp.RUnlock()
-	return lp.cacheMgr
-}
-
-func (lp *LocalProxy) SetCacheMgr(cm *CacheMgr) {
-	lp.Lock()
-	defer lp.Unlock()
-	lp.cacheMgr = cm
 }
 
 func (lp *LocalProxy) IsHealthy() bool {

@@ -26,8 +26,8 @@ func NewCacheMgr(s storage.Store) *CacheMgr {
 
 // ReadAll tag: v0.0.26 有打包使用 score: 130241.5284
 func ReadAll(r io.Reader) ([]byte, error) {
-	//b := make([]byte, 0, 532874)
-	b := make([]byte, 0, 1123876) // data.len: 1123875 线上测评数据
+	//b := make([]byte, 0, 532874) // local minikube data.len
+	b := make([]byte, 0, 1123875) // data.len: 1123875 线上测评数据
 	for {
 		if len(b) == cap(b) {
 			// Add more capacity (let append pick how much).
@@ -133,8 +133,8 @@ func (c *CacheMgr) QueryCache(info *apirequest.RequestInfo, labelType string) ([
 	return c.storage.Get(key)
 }
 
-func (c *CacheMgr) QueryCacheMem(info *apirequest.RequestInfo, labelType string) ([]byte, bool) {
-	key := KeyFunc(info.Resource, info.Namespace, labelType)
+func (c *CacheMgr) QueryCacheMem(resource, ns, labelType string) ([]byte, bool) {
+	key := KeyFunc(resource, ns, labelType)
 	data, ok := c.memdata[key]
 	return data, ok
 }

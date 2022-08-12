@@ -7,5 +7,4 @@ import (
 type LoadBalancer interface {
 	IsHealthy() bool
 	ServeHTTP(rw http.ResponseWriter, req *http.Request)
-	SetCacheMgr(cm *CacheMgr)
 }
