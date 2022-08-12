@@ -9,6 +9,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// checker for check remote server health or not
 type checker struct {
 	sync.RWMutex
 	remoteServer   *url.URL

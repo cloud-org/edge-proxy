@@ -64,7 +64,7 @@ func (rp *RemoteProxy) RoundTrip(request *http.Request) (*http.Response, error) 
 func (rp *RemoteProxy) errorHandler(rw http.ResponseWriter, req *http.Request, err error) {
 	klog.Errorf("remote proxy error handler: %s, %v", req.URL.String(), err)
 	rw.WriteHeader(http.StatusBadGateway)
-	// todo: 从缓存中进行查询 一致性查询中使用
+	// todo: maybe can query from cacheMgr
 }
 
 func (rp *RemoteProxy) Name() string {
@@ -86,11 +86,6 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 	ctx := req.Context()
 
 	labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
-	// if test resource then return directly
-	// you should cache if you need return resp not through proxy server
-	//if strings.Contains(labelSelector, resourceLabel) {
-	//	return nil
-	//}
 
 	// re-added transfer-encoding=chunked response header for watch request
 	info, exists := apirequest.RequestInfoFrom(ctx)
@@ -134,6 +129,7 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 			return nil
 		}
 
+		// cache resourceusage when first invoke
 		if checkLabel(info, labelSelector, resourceLabel) {
 			if rp.cacheMgr != nil && info.Namespace != "" {
 				rc, prc := util.NewDualReadCloser(req, resp.Body, true)
@@ -152,12 +148,12 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 			}
 		}
 
-		// cache
+		// cache consistency list data
 		if (info.IsResourceRequest && info.Verb == "list" &&
 			(info.Resource == "pods" || info.Resource == "configmaps") && labelSelector == "") ||
 			checkLabel(info, labelSelector, consistencyLabel) {
 			// cache resp with storage interface
-			if rp.cacheMgr != nil && info.Namespace != "" {
+			if rp.cacheMgr != nil && info.Namespace != "" { // info.Namespace should not be empty
 				rc, prc := util.NewDualReadCloser(req, resp.Body, true)
 				wrapPrc, _ := util.NewGZipReaderCloser(resp.Header, prc, info, "cache-manager")
 				go func(req *http.Request, prc io.ReadCloser) {

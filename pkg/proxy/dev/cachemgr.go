@@ -13,8 +13,8 @@ import (
 )
 
 type CacheMgr struct {
-	storage storage.Store
-	memdata map[string][]byte
+	storage storage.Store     // disk cache manager for consistency list
+	memdata map[string][]byte // mem cache for resourceusage list
 }
 
 func NewCacheMgr(s storage.Store) *CacheMgr {
@@ -44,6 +44,7 @@ func ReadAll(r io.Reader) ([]byte, error) {
 	}
 }
 
+//CacheResponseMem cache resourceusage list data
 func (c *CacheMgr) CacheResponseMem(info *apirequest.RequestInfo, prc io.ReadCloser, labelType string) error {
 	key := KeyFunc(info.Resource, info.Namespace, labelType)
 
@@ -65,6 +66,7 @@ func (c *CacheMgr) CacheResponseMem(info *apirequest.RequestInfo, prc io.ReadClo
 	return nil
 }
 
+//CacheResponse cache consistency list data
 func (c *CacheMgr) CacheResponse(info *apirequest.RequestInfo, prc io.ReadCloser, labelType string) error {
 	switch info.Resource {
 	case "pods":
@@ -88,7 +90,6 @@ func (c *CacheMgr) CacheResponse(info *apirequest.RequestInfo, prc io.ReadCloser
 			return err
 		}
 		key := KeyFunc(info.Resource, info.Namespace, labelType)
-		// todo: 暂时使用 create 进行测试
 		if err = c.storage.Create(key, marshalBytes); err != nil {
 			klog.Errorf("%s storage create err: %v", info.Resource, err)
 			return err
@@ -115,7 +116,6 @@ func (c *CacheMgr) CacheResponse(info *apirequest.RequestInfo, prc io.ReadCloser
 			return err
 		}
 		key := KeyFunc(info.Resource, info.Namespace, labelType)
-		// todo: 暂时使用 create 进行测试
 		if err = c.storage.Create(key, marshalBytes); err != nil {
 			klog.Errorf("storage create err: %v", err)
 			return err
@@ -128,11 +128,13 @@ func (c *CacheMgr) CacheResponse(info *apirequest.RequestInfo, prc io.ReadCloser
 	return nil
 }
 
+//QueryCache query for consistency list data
 func (c *CacheMgr) QueryCache(info *apirequest.RequestInfo, labelType string) ([]byte, error) {
 	key := KeyFunc(info.Resource, info.Namespace, labelType)
 	return c.storage.Get(key)
 }
 
+//QueryCacheMem query for resourceusage list data
 func (c *CacheMgr) QueryCacheMem(resource, ns, labelType string) ([]byte, bool) {
 	key := KeyFunc(resource, ns, labelType)
 	data, ok := c.memdata[key]

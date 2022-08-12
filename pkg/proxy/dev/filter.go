@@ -17,16 +17,17 @@ type skipListFilterReadCloser struct {
 	rc   io.ReadCloser
 }
 
-// todo: 暂时不考虑 watch
+// Read only for list
 func (s *skipListFilterReadCloser) Read(p []byte) (int, error) {
 	return s.data.Read(p)
 }
 
-// Close close readers
+// Close close resp reader
 func (s *skipListFilterReadCloser) Close() error {
 	return s.rc.Close()
 }
 
+// NewFilterReadCloser filter prefix for rc
 func NewFilterReadCloser(rc io.ReadCloser, resource string, prefix string) (int, io.ReadCloser, error) {
 	sfrc := &skipListFilterReadCloser{
 		data: new(bytes.Buffer),
