@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"code.aliyun.com/openyurt/edge-proxy/pkg/benchmark/util"
@@ -55,7 +57,99 @@ func (r *Resourceusage) Prepare(ctx context.Context) error {
 }
 
 func (r *Resourceusage) BenchMark(ctx context.Context) error {
-	return r.benchmark_configmap(ctx)
+	//return r.benchmark_configmap(ctx)
+	//return r.benchmark_configmap_count(ctx)
+	return r.benchmark_configmap_concurrent(ctx, 1) // 25 目前是这个数会高点
+}
+
+func (r *Resourceusage) invoke(ctx context.Context) error {
+	// list cms
+	cms, err := r.ProxyClient.CoreV1().ConfigMaps(r.NameSpace).List(
+		ctx, metav1.ListOptions{
+			LabelSelector: labels.SelectorFromSet(r.Labels).String(),
+		})
+	if err != nil {
+		return err
+	}
+	if len(r.PrepareConfigmaps) != len(cms.Items) {
+		klog.Errorf(
+			"Inconsistent data returned, prepare len %d get len %d",
+			len(r.PrepareConfigmaps),
+			len(cms.Items),
+		)
+		return fmt.Errorf("inconsistent data returned")
+	}
+
+	return nil
+}
+
+func (r *Resourceusage) benchmark_configmap_count(ctx context.Context) error {
+	wg := sync.WaitGroup{}
+	wg.Add(200)
+	for i := 0; i < 200; i++ {
+		go func() {
+			wg.Done()
+			if err := r.invoke(ctx); err != nil {
+				klog.Errorf("invoke err: %v", err)
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	return nil
+}
+
+func (r *Resourceusage) benchmark_configmap_concurrent(ctx context.Context, num int) error {
+	go func() {
+		klog.Infof("prepare to start cpu profile")
+		_, err := exec.Command("wget", "http://127.0.0.1:10267/debug/pprof/profile?seconds=60", "-O", "profile.txt").CombinedOutput()
+		if err != nil {
+			klog.Errorf("cpu err: %v", err)
+			return
+		}
+		//klog.Infof("data is %v", data)
+		return
+	}()
+	defer func() {
+		klog.Infof("prepare to start heap profile")
+		_, err := exec.Command("wget", "http://127.0.0.1:10267/debug/pprof/heap", "-O", "heap.txt").CombinedOutput()
+		if err != nil {
+			klog.Errorf("heap err: %v", err)
+			return
+		}
+		//klog.Infof("data is %v", data)
+		return
+	}()
+
+	var count int32
+	wg := sync.WaitGroup{}
+	wg.Add(num)
+	for i := 0; i < num; i++ {
+		go func(index int) {
+			defer wg.Done()
+			timer := time.NewTimer(1 * time.Minute)
+			for {
+				select {
+				case <-timer.C:
+					klog.Infof("timer received %v", index)
+					return
+				default:
+					if err := r.invoke(ctx); err != nil {
+						klog.Errorf("invoke err: %v", err)
+					} else { // 成功
+						atomic.AddInt32(&count, 1)
+					}
+				}
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	klog.Infof("count is %v, tps: %v/s", count, count/60)
+
+	return nil
 }
 
 func (r *Resourceusage) benchmark_configmap(ctx context.Context) error {
