@@ -4,7 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/openyurtio/openyurt/pkg/yurthub/storage/factory"
+	"code.aliyun.com/openyurt/edge-proxy/pkg/util"
+
 	"k8s.io/klog/v2"
 
 	"code.aliyun.com/openyurt/edge-proxy/cmd/edge-proxy/app/config"
@@ -40,7 +41,7 @@ func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 //initCacheMgr init cache mgr
 func (d *devFactory) initCacheMgr() (*CacheMgr, error) {
-	storageManager, err := factory.CreateStorage(d.cfg.DiskCachePath)
+	storageManager, err := util.NewDiskStorage(d.cfg.DiskCachePath)
 	if err != nil {
 		klog.Errorf("could not create storage manager, %v", err)
 		return nil, err

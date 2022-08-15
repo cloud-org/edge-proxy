@@ -5,8 +5,9 @@ import (
 	"io"
 	"path/filepath"
 
+	"code.aliyun.com/openyurt/edge-proxy/pkg/util/storage"
+
 	json "github.com/json-iterator/go"
-	"github.com/openyurtio/openyurt/pkg/yurthub/storage"
 	v1 "k8s.io/api/core/v1"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
