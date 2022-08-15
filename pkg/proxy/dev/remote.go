@@ -83,6 +83,11 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 	}
 
 	req := resp.Request
+
+	if req.Method != http.MethodGet {
+		return nil
+	}
+
 	ctx := req.Context()
 
 	labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
@@ -122,10 +127,13 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 			if needUncompressed {
 				resp.Header.Del("Content-Encoding")
 			}
+
+			klog.Infof("filter label not need to cache")
+			return nil
 		}
 
-		if checkLabel(info, labelSelector, filterLabel) || checkLabel(info, labelSelector, funcLabel) {
-			klog.Infof("functional/filter label not need to cache")
+		if checkLabel(info, labelSelector, funcLabel) {
+			klog.Infof("functional label not need to cache")
 			return nil
 		}
 

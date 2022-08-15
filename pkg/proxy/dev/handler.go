@@ -95,12 +95,16 @@ func (d *devFactory) returnCacheResourceUsage(handler http.Handler) http.Handler
 	var count int
 
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodGet {
+			handler.ServeHTTP(rw, req)
+			return
+		}
 		// if resource usage cache, then return, else continue
 		labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
 		if d.resourceCache && strings.Contains(labelSelector, resourceLabel) {
 			//klog.Infof("return resource cache")
 			count++
-			klog.Infof("resource usage count is %v", count)
+			klog.V(5).Infof("resource usage count is %v", count)
 			res, ok := d.cacheMgr.QueryCacheMem("configmaps", d.resourceNs, resourceType)
 			if !ok {
 				klog.Errorf("may be not resource cache")
@@ -132,7 +136,7 @@ func (d *devFactory) returnCacheResourceUsage(handler http.Handler) http.Handler
 			d.resourceCache = true        // set cache true
 			d.resourceNs = info.Namespace // set ns
 			count++
-			klog.Infof("first resource usage count is %v", count)
+			klog.V(5).Infof("first resource usage count is %v", count)
 		}
 	})
 }
