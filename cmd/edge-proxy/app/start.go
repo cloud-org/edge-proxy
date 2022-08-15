@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
@@ -23,10 +24,10 @@ func NewCmdStartEdgeProxy(stopCh <-chan struct{}) *cobra.Command {
 		Long:  "Launch " + projectinfo.GetProxyName(),
 		Run: func(cmd *cobra.Command, args []string) {
 			if edgeProxyOptions.Version {
-				fmt.Printf("%s: %#v\n", projectinfo.GetProxyName(), projectinfo.Get())
+				klog.Infof("%s: %#v\n", projectinfo.GetProxyName(), projectinfo.Get())
 				return
 			}
-			fmt.Printf("%s version: %#v\n", projectinfo.GetProxyName(), projectinfo.Get())
+			klog.Infof("%s version: %#v\n", projectinfo.GetProxyName(), projectinfo.Get())
 
 			cmd.Flags().VisitAll(func(flag *pflag.Flag) {
 				klog.V(1).Infof("FLAG: --%s=%q", flag.Name, flag.Value)
