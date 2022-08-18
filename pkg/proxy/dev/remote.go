@@ -97,6 +97,7 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 	if exists {
 		if info.Verb == "watch" {
 			h := resp.Header
+			// http reverse proxy will del transfer-encoding header, so add this
 			if hv := h.Get("Transfer-Encoding"); hv == "" {
 				h.Add("Transfer-Encoding", "chunked")
 				klog.Infof("add Transfer-Encoding header")
