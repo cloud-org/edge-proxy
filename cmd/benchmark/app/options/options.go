@@ -12,13 +12,15 @@ type BenchMarkOptions struct {
 	Namespace     string
 	UseKubeConfig bool
 	BenchType     string
+	BenchCount    int
 }
 
 // NewBenchmarkOptions creates a new BenchMarkOptions with a default config.
 func NewBenchmarkOptions() *BenchMarkOptions {
 	o := &BenchMarkOptions{
-		TimeOut:   60 * 30, // second
-		BenchType: "all",
+		TimeOut:    60 * 30, // second
+		BenchType:  "all",
+		BenchCount: 1,
 	}
 	return o
 }
@@ -38,4 +40,5 @@ func (o *BenchMarkOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.Namespace, "namespace", o.Namespace, "bench mark namespace")
 	fs.StringVar(&o.BenchType, "bench", o.BenchType, "bench type(all|resource|func|filter|consistency)")
 	fs.BoolVar(&o.UseKubeConfig, "use-kubeconfig", o.UseKubeConfig, "use kubeconfig or not. 集群外测试使用")
+	fs.IntVar(&o.BenchCount, "count", o.BenchCount, "bench mark count for resourceusage")
 }

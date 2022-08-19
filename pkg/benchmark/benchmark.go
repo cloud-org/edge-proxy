@@ -135,7 +135,7 @@ func NewBenchMark(deps *options.BenchMarkOptions) (*BenchMark, error) {
 		b.SubBenchMarkers = append(b.SubBenchMarkers,
 			NewFunctional(b.Namespace, proxycs, cs, b.ProxyConfigMapLister, b.ConfigMapLister),
 			NewFilter(b.Namespace, proxycs, cs),
-			NewResourceusage(b.Namespace, proxycs, cs),
+			NewResourceusage(b.Namespace, proxycs, cs, deps.BenchCount),
 			NewConsistency(b.Namespace, proxycs, cs),
 		)
 	case "filter":
@@ -152,7 +152,7 @@ func NewBenchMark(deps *options.BenchMarkOptions) (*BenchMark, error) {
 		)
 	case "resource":
 		b.SubBenchMarkers = append(b.SubBenchMarkers,
-			NewResourceusage(b.Namespace, proxycs, cs),
+			NewResourceusage(b.Namespace, proxycs, cs, deps.BenchCount),
 		)
 	}
 

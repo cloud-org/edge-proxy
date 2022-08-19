@@ -24,6 +24,7 @@ type Resourceusage struct {
 	NameSpace         string
 	Labels            map[string]string
 	Nums              int
+	Count             int
 }
 
 func (r *Resourceusage) Prepare(ctx context.Context) error {
@@ -59,7 +60,7 @@ func (r *Resourceusage) Prepare(ctx context.Context) error {
 func (r *Resourceusage) BenchMark(ctx context.Context) error {
 	//return r.benchmark_configmap(ctx)
 	//return r.benchmark_configmap_count(ctx)
-	return r.benchmark_configmap_concurrent(ctx, 1) // 25 目前是这个数会高点
+	return r.benchmark_configmap_concurrent(ctx, r.Count) // 25 目前是这个数会高点
 }
 
 func (r *Resourceusage) invoke(ctx context.Context) error {
@@ -223,12 +224,13 @@ func (r *Resourceusage) String() string {
 	return fmt.Sprintf("benchMark %s", r.Name())
 }
 
-func NewResourceusage(ns string, proxyClient, client kubernetes.Interface) *Resourceusage {
+func NewResourceusage(ns string, proxyClient, client kubernetes.Interface, count int) *Resourceusage {
 	return &Resourceusage{
 		ProxyClient: proxyClient,
 		Client:      client,
 		NameSpace:   ns,
 		Nums:        1000,
+		Count:       count,
 		Labels: map[string]string{
 			"type":                    "resourceusage",
 			util.BENCH_MARK_LABEL_KEY: util.BENCH_MARK_LABEL_VALUE,
