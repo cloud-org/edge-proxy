@@ -51,3 +51,5 @@ docker-build-deploy:
 docker-build:
 	docker buildx build --push ${DOCKER_BUILD_ARGS} --platform ${TARGET_PLATFORMS} -f hack/dockerfiles/Dockerfile . -t ${IMAGE_REPO}/edge-proxy:${GIT_VERSION}
 
+docker-build-go: # custom go version
+	docker buildx build --push ${DOCKER_BUILD_ARGS} --platform ${TARGET_PLATFORMS} -f hack/dockerfiles/amd64.Dockerfile . -t ${IMAGE_REPO}/edge-proxy:${GIT_VERSION}
