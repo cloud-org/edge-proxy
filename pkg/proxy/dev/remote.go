@@ -145,7 +145,7 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 				wrapPrc, _ := util.NewGZipReaderCloser(resp.Header, prc, info, "cache-manager")
 				go func(req *http.Request, prc io.ReadCloser) {
 					klog.Infof("cache resourceusage response")
-					err := rp.cacheMgr.CacheResponseMem(info, prc, resourceType)
+					err := rp.cacheMgr.CacheResponseMemNew(info, prc, resourceType)
 					if err != nil {
 						klog.Errorf("%s response cache ended with error, %v", info.Resource, err)
 					}
