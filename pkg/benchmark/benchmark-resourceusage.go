@@ -113,7 +113,7 @@ func (r *Resourceusage) benchmark_configmap(ctx context.Context) error {
 					klog.Errorf("get cm %s key error %v", klog.KObj(&c), err)
 					return err
 				}
-				klog.Infof("resource key is %v", key)
+				//klog.Infof("resource key is %v", key)
 				if _, ok := r.PrepareConfigmaps[key]; !ok {
 					klog.Errorf("Can not find %s from prepare configmaps", key)
 					return fmt.Errorf("can not find %s from prepare configmaps", key)
