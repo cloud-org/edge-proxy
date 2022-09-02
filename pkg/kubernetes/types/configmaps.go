@@ -30,11 +30,7 @@ type Metadata struct {
 	//ManagedFields     []ManagedFields `json:"managedFields"`
 }
 
-type Data struct {
-	Test string `json:"test"`
-}
-
 type ConfigMap struct {
 	Metadata Metadata `json:"metadata"`
-	//Data     Data     `json:"data"`
+	//Data     map[string]string `json:"data"`
 }
