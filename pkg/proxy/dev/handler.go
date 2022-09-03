@@ -2,7 +2,6 @@ package dev
 
 import (
 	"net/http"
-	"strings"
 
 	"code.aliyun.com/openyurt/edge-proxy/pkg/util"
 
@@ -20,13 +19,13 @@ func init() {
 }
 
 type devFactory struct {
-	resolver      apirequest.RequestInfoResolver
-	loadBalancer  LoadBalancer
-	localProxy    LoadBalancer
-	cfg           *config.EdgeProxyConfiguration
-	cacheMgr      *CacheMgr
-	resourceCache bool
-	resourceNs    string
+	resolver     apirequest.RequestInfoResolver
+	loadBalancer LoadBalancer
+	localProxy   LoadBalancer
+	cfg          *config.EdgeProxyConfiguration
+	cacheMgr     *CacheMgr
+	//resourceCache bool
+	//resourceNs    string
 }
 
 func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -93,51 +92,44 @@ func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 
 //returnCacheResourceUsage if labelSelector contains type=resourceusage, then return mem data if ok
 func (d *devFactory) returnCacheResourceUsage(handler http.Handler) http.Handler {
-	var count int
 
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodGet {
 			handler.ServeHTTP(rw, req)
 			return
 		}
-		// if resource usage cache, then return, else continue
-		labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
-		if d.resourceCache && strings.Contains(labelSelector, resourceLabel) {
-			//klog.Infof("return resource cache")
-			count++
-			klog.V(5).Infof("resource usage count is %v", count)
-			res, ok := d.cacheMgr.QueryCacheMem("configmaps", d.resourceNs, resourceType)
-			if !ok {
-				klog.Errorf("may be not resource cache")
-				goto end
-			}
-
-			rw.Header().Set("Content-Type", "application/json")
-			rw.WriteHeader(http.StatusOK)
-			_, err := rw.Write(res)
-			if err != nil {
-				klog.Errorf("rw.Write err: %v", err)
-				goto end
-			}
-			// return if not err
-			return
-		}
-	end:
 
 		info, err := d.resolver.NewRequestInfo(req)
 		if err != nil {
 			klog.Errorf("resolver request info err: %v", err)
 			return
 		}
+
 		// inject info
 		req = req.WithContext(apirequest.WithRequestInfo(req.Context(), info))
-		// no resource cache
-		handler.ServeHTTP(rw, req)
-		if checkLabel(info, labelSelector, resourceLabel) {
-			d.resourceCache = true        // set cache true
-			d.resourceNs = info.Namespace // set ns
-			count++
-			klog.V(5).Infof("first resource usage count is %v", count)
+
+		if info.Verb != "list" {
+			handler.ServeHTTP(rw, req)
+			return
 		}
+
+		labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
+
+		res, ok := d.cacheMgr.QueryCacheMem(info.Resource, info.Namespace, labelSelector)
+		if !ok {
+			klog.Errorf("may be not resource cache")
+			handler.ServeHTTP(rw, req)
+			return
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+		_, err = rw.Write(res)
+		if err != nil {
+			klog.Errorf("rw.Write err: %v", err)
+		}
+		// return if not err
+		return
+
 	})
 }

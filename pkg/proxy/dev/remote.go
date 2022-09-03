@@ -139,22 +139,20 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 		}
 
 		// cache resourceusage when first invoke
-		if checkLabel(info, labelSelector, resourceLabel) {
-			if rp.cacheMgr != nil && info.Namespace != "" {
-				rc, prc := util.NewDualReadCloser(req, resp.Body, true)
-				wrapPrc, _ := util.NewGZipReaderCloser(resp.Header, prc, info, "cache-manager")
-				go func(req *http.Request, prc io.ReadCloser) {
-					klog.Infof("cache resourceusage response")
-					err := rp.cacheMgr.CacheResponseMemNew(info, prc, resourceType)
-					if err != nil {
-						klog.Errorf("%s response cache ended with error, %v", info.Resource, err)
-					}
-				}(req, wrapPrc)
+		if rp.cacheMgr != nil && info.Namespace != "" && labelSelector != "" {
+			rc, prc := util.NewDualReadCloser(req, resp.Body, true)
+			wrapPrc, _ := util.NewGZipReaderCloser(resp.Header, prc, info, "cache-manager")
+			go func(req *http.Request, prc io.ReadCloser) {
+				klog.Infof("cache resourceusage response")
+				err := rp.cacheMgr.CacheResponseMemNew(info, prc, labelSelector)
+				if err != nil {
+					klog.Errorf("%s response cache ended with error, %v", info.Resource, err)
+				}
+			}(req, wrapPrc)
 
-				resp.Body = rc
-				// return directly
-				return nil
-			}
+			resp.Body = rc
+			// return directly
+			return nil
 		}
 
 		// cache consistency list data

@@ -50,17 +50,28 @@ func ReadAll(r io.Reader) ([]byte, error) {
 
 func (c *CacheMgr) CacheResponseMemNew(info *apirequest.RequestInfo, prc io.ReadCloser, labelType string) error {
 
-	var configmaps types.ConfigMapList
-	err := json.NewDecoder(prc).Decode(&configmaps)
-	if err != nil {
-		klog.Errorf("%s decode err: %v", info.Resource, err)
-		return err
-	}
+	var data []byte
+	var err error
+	switch info.Resource {
+	case "pods":
+		data, err = io.ReadAll(prc)
+		if err != nil {
+			klog.Errorf("read all err: %v", err)
+			return err
+		}
+	case "configmaps":
+		var configmaps types.ConfigMapList
+		err = json.NewDecoder(prc).Decode(&configmaps)
+		if err != nil {
+			klog.Errorf("%s decode err: %v", info.Resource, err)
+			return err
+		}
 
-	data, err := json.Marshal(configmaps)
-	if err != nil {
-		klog.Errorf("%s marshal err: %v", info.Resource, err)
-		return err
+		data, err = json.Marshal(configmaps)
+		if err != nil {
+			klog.Errorf("%s marshal err: %v", info.Resource, err)
+			return err
+		}
 	}
 	key := KeyFunc(info.Resource, info.Namespace, labelType)
 	//if err = c.storage.Create(key, marshalBytes); err != nil {

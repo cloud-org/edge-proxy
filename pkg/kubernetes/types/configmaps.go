@@ -31,6 +31,6 @@ type Metadata struct {
 }
 
 type ConfigMap struct {
-	Metadata Metadata `json:"metadata"`
-	//Data     map[string]string `json:"data"`
+	Metadata Metadata          `json:"metadata"`
+	Data     map[string]string `json:"data"`
 }
