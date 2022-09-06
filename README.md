@@ -12,7 +12,6 @@
   - [docker-build and gen manifest yaml file](#docker-build-and-gen-manifest-yaml-file)
   - [deploy benchmark pod](#deploy-benchmark-pod)
   - [retest](#retest)
-  - [Coding Time](#coding-time)
   - [acknowledgement](#acknowledgement)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -111,11 +110,6 @@ kubectl delete -f _output/manifest.yaml
 ```
 kubectl apply -f _output/manifest.yaml
 ```
-
-### Coding Time
-
-![wakatime](https://wakatime.com/badge/user/01c864c3-99e2-47a2-ad28-cc0f36b02f39/project/8ae39e6c-e2ff-45a3-acbf-e5deee6bdfa8.svg)
-
 
 ### acknowledgement
 
