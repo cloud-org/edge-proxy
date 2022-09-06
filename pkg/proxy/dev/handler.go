@@ -19,18 +19,18 @@ func init() {
 }
 
 type devFactory struct {
-	resolver     apirequest.RequestInfoResolver
-	loadBalancer LoadBalancer
-	localProxy   LoadBalancer
-	cfg          *config.EdgeProxyConfiguration
-	cacheMgr     *CacheMgr
+	resolver    apirequest.RequestInfoResolver
+	remoteProxy APIServer
+	localProxy  APIServer
+	cfg         *config.EdgeProxyConfiguration
+	cacheMgr    *CacheMgr
 	//resourceCache bool
 	//resourceNs    string
 }
 
 func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if d.loadBalancer.IsHealthy() {
-		d.loadBalancer.ServeHTTP(rw, req)
+	if d.remoteProxy.IsHealthy() {
+		d.remoteProxy.ServeHTTP(rw, req)
 		return
 	}
 
@@ -68,7 +68,7 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 
 	d.cacheMgr = cacheMgr
 	lb, _ := NewRemoteProxy(remoteServer, cacheMgr, cfg.RT, stopCh)
-	d.loadBalancer = lb
+	d.remoteProxy = lb
 
 	// local proxy when lb is not healthy
 	d.localProxy = NewLocalProxy(cacheMgr, lb.IsHealthy)
@@ -78,11 +78,9 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 
 // buildHandlerChain use middleware
 func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
-	//handler = yurthubutil.WithRequestContentType(handler)
 	//handler = d.printCreateReqBody(handler)
-	handler = d.returnCacheResourceUsage(handler)
+	handler = d.returnLabelSelectorList(handler)
 	//handler = d.countReq(handler)
-	//handler = d.WithMaxInFlightLimit(handler, 200) // 两百个并发
 
 	// inject request info
 	//handler = filters.WithRequestInfo(handler, d.resolver)
@@ -90,10 +88,11 @@ func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
 	return handler
 }
 
-//returnCacheResourceUsage if labelSelector contains type=resourceusage, then return mem data if ok
-func (d *devFactory) returnCacheResourceUsage(handler http.Handler) http.Handler {
+//returnLabelSelectorList if labelSelector list, then return mem data if ok
+func (d *devFactory) returnLabelSelectorList(handler http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		// only handle HTTP GET method
 		if req.Method != http.MethodGet {
 			handler.ServeHTTP(rw, req)
 			return
@@ -127,9 +126,10 @@ func (d *devFactory) returnCacheResourceUsage(handler http.Handler) http.Handler
 		_, err = rw.Write(res)
 		if err != nil {
 			klog.Errorf("rw.Write err: %v", err)
+			handler.ServeHTTP(rw, req)
+			return
 		}
 		// return if not err
 		return
-
 	})
 }

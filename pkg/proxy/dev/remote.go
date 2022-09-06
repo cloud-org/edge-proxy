@@ -14,6 +14,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// RemoteProxy reverse proxy for remote kube-apiserver
 type RemoteProxy struct {
 	remoteServer     *url.URL
 	reverseProxy     *httputil.ReverseProxy
@@ -92,12 +93,11 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 
 	labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
 
-	// re-added transfer-encoding=chunked response header for watch request
 	info, exists := apirequest.RequestInfoFrom(ctx)
 	if exists {
 		if info.Verb == "watch" {
 			h := resp.Header
-			// http reverse proxy will del transfer-encoding header, so add this
+			// http reverse proxy will del transfer-encoding header, so re-add this key=value
 			if hv := h.Get("Transfer-Encoding"); hv == "" {
 				h.Add("Transfer-Encoding", "chunked")
 				klog.Infof("add Transfer-Encoding header")
