@@ -7,19 +7,6 @@ type ConfigMapList struct {
 	Items []ConfigMap `json:"items"`
 }
 
-//type Metadata struct {
-//	ResourceVersion string `json:"resourceVersion"`
-//}
-
-//type ManagedFields struct {
-//	Manager    string    `json:"manager"`
-//	Operation  string    `json:"operation"`
-//	APIVersion string    `json:"apiVersion"`
-//	Time       time.Time `json:"time"`
-//	FieldsType string    `json:"fieldsType"`
-//	FieldsV1   FieldsV1  `json:"fieldsV1"`
-//}
-
 type Metadata struct {
 	Name      string `json:"name"`
 	Namespace string `json:"namespace"`

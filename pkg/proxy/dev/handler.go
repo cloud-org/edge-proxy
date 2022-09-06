@@ -21,8 +21,8 @@ func init() {
 
 type devFactory struct {
 	resolver      apirequest.RequestInfoResolver
-	remoteProxy   APIServer
-	localProxy    APIServer
+	remoteProxy   APIServerProxy
+	localProxy    APIServerProxy
 	cfg           *config.EdgeProxyConfiguration
 	cacheMgr      *CacheMgr
 	resourceCache bool
