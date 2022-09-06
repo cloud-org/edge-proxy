@@ -4,6 +4,7 @@
 
 - [edge-proxy](#edge-proxy)
   - [arch design](#arch-design)
+  - [notice](#notice)
   - [build binary](#build-binary)
   - [local test use minikube not in cluster(use kubeconfig)](#local-test-use-minikube-not-in-clusteruse-kubeconfig)
   - [docker build and push](#docker-build-and-push)
@@ -21,6 +22,10 @@
 ### arch design
 
 ![](./img/arch.png)
+
+### notice
+
+经过测试,大赛 benchmark 使用的是一个协程进行压测，所以关于 map 的使用为了提高性能没有考虑读写并发安全的问题，并发安全的分支可参考 `11-fix-solve-concurrent-coroutine-request-problem` 分支
 
 ### build binary
 
