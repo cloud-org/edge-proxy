@@ -21,8 +21,8 @@ func init() {
 
 type devFactory struct {
 	resolver      apirequest.RequestInfoResolver
-	loadBalancer  LoadBalancer
-	localProxy    LoadBalancer
+	remoteProxy   APIServerProxy
+	localProxy    APIServerProxy
 	cfg           *config.EdgeProxyConfiguration
 	cacheMgr      *CacheMgr
 	resourceCache bool
@@ -30,8 +30,8 @@ type devFactory struct {
 }
 
 func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if d.loadBalancer.IsHealthy() {
-		d.loadBalancer.ServeHTTP(rw, req)
+	if d.remoteProxy.IsHealthy() {
+		d.remoteProxy.ServeHTTP(rw, req)
 		return
 	}
 
@@ -69,7 +69,7 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 
 	d.cacheMgr = cacheMgr
 	lb, _ := NewRemoteProxy(remoteServer, cacheMgr, cfg.RT, stopCh)
-	d.loadBalancer = lb
+	d.remoteProxy = lb
 
 	// local proxy when lb is not healthy
 	d.localProxy = NewLocalProxy(cacheMgr, lb.IsHealthy)

@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-type LoadBalancer interface {
+type APIServerProxy interface {
 	IsHealthy() bool
 	ServeHTTP(rw http.ResponseWriter, req *http.Request)
 }

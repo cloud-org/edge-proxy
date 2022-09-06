@@ -5,6 +5,8 @@ import (
 	"io"
 	"path/filepath"
 
+	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/types"
+
 	"code.aliyun.com/openyurt/edge-proxy/pkg/util/storage"
 
 	json "github.com/json-iterator/go"
@@ -44,6 +46,35 @@ func ReadAll(r io.Reader) ([]byte, error) {
 			return b, err
 		}
 	}
+}
+
+func (c *CacheMgr) CacheResponseMemNew(info *apirequest.RequestInfo, prc io.ReadCloser, labelType string) error {
+
+	var configmaps types.ConfigMapList
+	err := json.NewDecoder(prc).Decode(&configmaps)
+	if err != nil {
+		klog.Errorf("%s decode err: %v", info.Resource, err)
+		return err
+	}
+
+	data, err := json.Marshal(configmaps)
+	if err != nil {
+		klog.Errorf("%s marshal err: %v", info.Resource, err)
+		return err
+	}
+	key := KeyFunc(info.Resource, info.Namespace, labelType)
+	//if err = c.storage.Create(key, marshalBytes); err != nil {
+	// klog.Errorf("storage create err: %v", err)
+	// return err
+	//}
+	//klog.Infof("%s storage create ok", info.Resource)
+
+	//data := p.Bytes()
+	c.memdata[key] = data
+
+	klog.Infof("%s memdata create ok, data.len: %v, data.cap: %v", info.Resource, len(data), cap(data))
+
+	return nil
 }
 
 //CacheResponseMem cache resourceusage list data
