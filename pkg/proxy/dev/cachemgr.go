@@ -17,10 +17,13 @@ import (
 
 //CacheMgr cache for list resp.Body
 type CacheMgr struct {
-	storage storage.Store     // disk cache manager for consistency list
-	memdata map[string][]byte // mem cache for resourceusage list
+	//storage disk cache manager for consistency list
+	storage storage.Store
+	//memdata memory cache for list labelSelector result
+	memdata map[string][]byte
 }
 
+// NewCacheMgr create a cachemgr
 func NewCacheMgr(s storage.Store) *CacheMgr {
 	return &CacheMgr{
 		storage: s,
@@ -29,6 +32,9 @@ func NewCacheMgr(s storage.Store) *CacheMgr {
 }
 
 //CacheResponseMemNew handle pod and configmaps mem cache
+// info: req inject requestInfo
+// prc: is a readCloser
+// labelType: filter resource label type or generate unique key for cache
 func (c *CacheMgr) CacheResponseMemNew(info *apirequest.RequestInfo, prc io.ReadCloser, labelType string) error {
 
 	var data []byte
@@ -104,7 +110,7 @@ func (c *CacheMgr) CacheResponse(info *apirequest.RequestInfo, prc io.ReadCloser
 		}
 		var items []v1.Pod
 		for i := 0; i < len(podList.Items); i++ {
-			// filter
+			// filter label type
 			if podList.Items[i].Labels["type"] == labelType {
 				//klog.Infof("add item %s", podList.Items[i].Name)
 				items = append(items, podList.Items[i])
@@ -131,7 +137,7 @@ func (c *CacheMgr) CacheResponse(info *apirequest.RequestInfo, prc io.ReadCloser
 		}
 		var items []v1.ConfigMap
 		for i := 0; i < len(configmaps.Items); i++ {
-			// filter
+			// filter label type
 			if configmaps.Items[i].Labels["type"] == labelType {
 				//klog.Infof("add item %s", configmaps.Items[i].Name)
 				items = append(items, configmaps.Items[i])
@@ -162,14 +168,14 @@ func (c *CacheMgr) QueryCache(info *apirequest.RequestInfo, labelType string) ([
 	return c.storage.Get(key)
 }
 
-//QueryCacheMem query for resourceusage list data
+//QueryCacheMem query for labelSelector list data
 func (c *CacheMgr) QueryCacheMem(resource, ns, labelType string) ([]byte, bool) {
 	key := KeyFunc(resource, ns, labelType)
 	data, ok := c.memdata[key]
 	return data, ok
 }
 
-// KeyFunc combine comp resource ns name into a key
+// KeyFunc generate a key for cache manager
 func KeyFunc(resource, ns, labelType string) string {
 	comp := "bench"
 	return filepath.Join(comp, resource, ns, labelType)

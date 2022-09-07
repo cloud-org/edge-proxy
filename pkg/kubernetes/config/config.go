@@ -11,7 +11,7 @@ import (
 
 var kubeConfigPath = os.Getenv("HOME") + "/.kube/config"
 
-//InitClient 初始化 k8s 客户端
+//InitClient init apiserver client
 func InitClient(usekubeconfig bool) (*kubernetes.Clientset, error) {
 	var cfg *rest.Config
 	var err error
@@ -28,7 +28,7 @@ func InitClient(usekubeconfig bool) (*kubernetes.Clientset, error) {
 	return kubernetes.NewForConfig(cfg)
 }
 
-//GetRestConf 获取 k8s restful client 配置
+//GetRestConf get rest config from kubeconfig file
 func GetRestConf() (*rest.Config, error) {
 	// 读 kubeconfig 文件
 	kubeconfig, err := ioutil.ReadFile(kubeConfigPath)

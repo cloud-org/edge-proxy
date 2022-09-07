@@ -8,10 +8,14 @@ import (
 
 // BenchMarkOptions is the main settings for the edge-proxy
 type BenchMarkOptions struct {
-	TimeOut       int // second
-	Namespace     string
+	// TimeOut benchmark timeout
+	TimeOut int
+	// Namespace benchmark ns
+	Namespace string
+	// UseKubeConfig for local minikube cluster test
 	UseKubeConfig bool
-	BenchType     string
+	// BenchType options: func|filter|resource|consistency|all
+	BenchType string
 }
 
 // NewBenchmarkOptions creates a new BenchMarkOptions with a default config.

@@ -19,13 +19,15 @@ func init() {
 }
 
 type devFactory struct {
-	resolver    apirequest.RequestInfoResolver
-	remoteProxy APIServer
-	localProxy  APIServer
-	cfg         *config.EdgeProxyConfiguration
-	cacheMgr    *CacheMgr
-	//resourceCache bool
-	//resourceNs    string
+	// for inject request info to http.Request
+	resolver apirequest.RequestInfoResolver
+	// remoteProxy reverseProxy for remote server
+	remoteProxy APIServerProxy
+	// localProxy use local proxy when remote server unhealthy
+	localProxy APIServerProxy
+	cfg        *config.EdgeProxyConfiguration
+	// cacheMgr cache manager
+	cacheMgr *CacheMgr
 }
 
 func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -34,7 +36,7 @@ func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// if lb not healthy, then use localProxy
+	// if remoteProxy not healthy, then use localProxy
 	d.localProxy.ServeHTTP(rw, req)
 }
 
@@ -67,23 +69,19 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 	}
 
 	d.cacheMgr = cacheMgr
+	// init remoteProxy
 	lb, _ := NewRemoteProxy(remoteServer, cacheMgr, cfg.RT, stopCh)
 	d.remoteProxy = lb
 
-	// local proxy when lb is not healthy
+	// init localProxy
 	d.localProxy = NewLocalProxy(cacheMgr, lb.IsHealthy)
 
 	return d.buildHandlerChain(d), nil
 }
 
-// buildHandlerChain use middleware
+// buildHandlerChain use middleware for handler
 func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
-	//handler = d.printCreateReqBody(handler)
 	handler = d.returnLabelSelectorList(handler)
-	//handler = d.countReq(handler)
-
-	// inject request info
-	//handler = filters.WithRequestInfo(handler, d.resolver)
 
 	return handler
 }
@@ -104,9 +102,10 @@ func (d *devFactory) returnLabelSelectorList(handler http.Handler) http.Handler 
 			return
 		}
 
-		// inject info
+		// inject request info
 		req = req.WithContext(apirequest.WithRequestInfo(req.Context(), info))
 
+		// only for info.Verb equal list
 		if info.Verb != "list" {
 			handler.ServeHTTP(rw, req)
 			return
@@ -114,6 +113,7 @@ func (d *devFactory) returnLabelSelectorList(handler http.Handler) http.Handler 
 
 		labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
 
+		// query from cachemgr
 		res, ok := d.cacheMgr.QueryCacheMem(info.Resource, info.Namespace, labelSelector)
 		if !ok {
 			klog.Errorf("may be not resource cache")
@@ -123,6 +123,7 @@ func (d *devFactory) returnLabelSelectorList(handler http.Handler) http.Handler 
 
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
+		// write cache result
 		_, err = rw.Write(res)
 		if err != nil {
 			klog.Errorf("rw.Write err: %v", err)

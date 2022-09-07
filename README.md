@@ -4,6 +4,8 @@
 
 - [edge-proxy](#edge-proxy)
   - [arch design](#arch-design)
+  - [notice](#notice)
+  - [tree](#tree)
   - [build binary](#build-binary)
   - [local test use minikube not in cluster(use kubeconfig)](#local-test-use-minikube-not-in-clusteruse-kubeconfig)
   - [docker build and push](#docker-build-and-push)
@@ -11,7 +13,6 @@
   - [docker-build and gen manifest yaml file](#docker-build-and-gen-manifest-yaml-file)
   - [deploy benchmark pod](#deploy-benchmark-pod)
   - [retest](#retest)
-  - [Coding Time](#coding-time)
   - [acknowledgement](#acknowledgement)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -22,13 +23,52 @@
 
 ![](./img/arch.png)
 
+### notice
+
+> 该分支为 labelSelector-cachemgr, 实现了通用的 labelSelector list cachemgr, 特殊判断 resourceLabel 请参考 master 分支
+
+经过测试,大赛 benchmark 使用的是一个协程进行压测，所以关于 map 的使用为了提高性能没有考虑读写并发安全的问题，并发安全的分支可参考 `11-fix-solve-concurrent-coroutine-request-problem` 分支
+
+### tree
+
+- `pkg/kubernetes`
+
+```
+├── config        // use kubeconfig for benchmark local test
+├── health        // for apiserver health check livez
+└── types         // define struct for apiserver list result
+```
+
+- `pkg/proxy/dev`
+
+```
+├── cachemgr.go         // cache apiserver list result
+├── cachemgr_test.go    // unit test
+├── checker.go          // remote server health check
+├── common.go           // const define
+├── filter.go           // for filter benchmark
+├── handler.go          // edge-proxy handler
+├── infra.go            // apiserver interface define
+├── local.go            // local proxy for consistency benchmark
+└── remote.go           // remote proxy
+```
+
+- `pkg/benchmark`
+
+```
+├── benchmark-consistency.go
+├── benchmark-filter.go
+├── benchmark-functional.go
+├── benchmark-resourceusage.go // use pprof and timer for benchmark
+```
+
 ### build binary
 
 ```
 make build
 ```
 
-make build 命令会生成两个二进制:edge-proxy 和 benchmark, 存放在目录：_output/local/bin/{GOOS}/{GOARCH}/
+make build 命令会生成两个二进制: edge-proxy 和 benchmark, 存放在目录：_output/local/bin/{GOOS}/{GOARCH}/
 
 * edge-proxy 是本次比赛的框架代码，选手可以根据里面的主体逻辑实现对应的功能。
 * benchmark 是提供的一个用于本地调试 edge-proxy 功能的工具，选手也参照 benchmark 提供的代码，对 edge-proxy 更详细的测试。
@@ -36,9 +76,12 @@ make build 命令会生成两个二进制:edge-proxy 和 benchmark, 存放在目
 ### local test use minikube not in cluster(use kubeconfig)
 
 ```sh
+# edge-proxy
 export server_addr=$(kubectl config view --minify -o=jsonpath="{.clusters[*].cluster.server}")
-export ns=$(kubectl get cm kube-root-ca.crt -o=jsonpath="{.metadata.namespace}")
 ./edge-proxy --server-addr ${server_addr} --use-kubeconfig true --enable-sample-handler true --disk-cache-path ~/.kube/cloudnative-challenge/cache
+
+# benchmark
+export ns=$(kubectl get cm kube-root-ca.crt -o=jsonpath="{.metadata.namespace}")
 ./benchmark --namespace ${ns} --use-kubeconfig
 ```
 
@@ -67,7 +110,7 @@ alias kubectl='kubectl --kubeconfig ~/.kube/cloudnative-challenge/config'
 * DOCKER_PASSWD 指定阿里云镜像仓库的密码
 
 ```
-make docker-build IMAGE_REPO=registry.cn-shanghai.aliyuncs.com/cloudnative-challenge IMAGE_TAG=v1.0 REGION=cn DOCKER_USERNAME=** DOCKER_PASSWD=**
+make docker-build IMAGE_REPO=registry.cn-shanghai.aliyuncs.com/cloudnative-challenge IMAGE_TAG=v1.0 REGION=cn
 ```
 
 若 `make docker-build` 命令执行成功， 会自动 push 镜像到对应的阿里云镜像仓库中，并且在`_output/` 目录下生成 `manifest.yaml` 文件。
@@ -104,11 +147,6 @@ kubectl delete -f _output/manifest.yaml
 ```
 kubectl apply -f _output/manifest.yaml
 ```
-
-### Coding Time
-
-![wakatime](https://wakatime.com/badge/user/01c864c3-99e2-47a2-ad28-cc0f36b02f39/project/8ae39e6c-e2ff-45a3-acbf-e5deee6bdfa8.svg)
-
 
 ### acknowledgement
 

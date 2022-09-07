@@ -1,3 +1,4 @@
+# get binary from local dir to build docker image
 FROM --platform=${BUILDPLATFORM} ubuntu:20.04
 ARG TARGETOS TARGETARCH MIRROR_REPO
 #RUN if [ ! -z "${MIRROR_REPO+x}" ]; then sed -i "s/dl-cdn.alpinelinux.org/${MIRROR_REPO}/g" /etc/apk/repositories; fi && \

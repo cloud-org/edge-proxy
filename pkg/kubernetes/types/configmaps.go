@@ -1,24 +1,12 @@
 package types
 
+//ConfigMapList v1.ConfigMapList compress some fields
 type ConfigMapList struct {
 	Kind       string `json:"kind"`
 	APIVersion string `json:"apiVersion"`
 	//Metadata   Metadata `json:"metadata"`
 	Items []ConfigMap `json:"items"`
 }
-
-//type Metadata struct {
-//	ResourceVersion string `json:"resourceVersion"`
-//}
-
-//type ManagedFields struct {
-//	Manager    string    `json:"manager"`
-//	Operation  string    `json:"operation"`
-//	APIVersion string    `json:"apiVersion"`
-//	Time       time.Time `json:"time"`
-//	FieldsType string    `json:"fieldsType"`
-//	FieldsV1   FieldsV1  `json:"fieldsV1"`
-//}
 
 type Metadata struct {
 	Name      string `json:"name"`

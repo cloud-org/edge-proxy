@@ -17,8 +17,9 @@ import (
 
 // EdgeProxyConfiguration represents configuration of edge proxy
 type EdgeProxyConfiguration struct {
-	RT                  http.RoundTripper
-	RemoteServers       []*url.URL
+	RT            http.RoundTripper
+	RemoteServers []*url.URL
+	// DiskCachePath fix typo
 	DiskCachePath       string
 	BindAddr            string
 	EdgeProxyServerAddr string
@@ -81,6 +82,7 @@ func parseRemoteServers(serverAddr string) ([]*url.URL, error) {
 	return us, nil
 }
 
+// prepareRoundTripper if usekubeconfig is true, then use kubeconfig file, else use inClusterConfig
 func prepareRoundTripper(usekubeconfig bool) (http.RoundTripper, error) {
 	var (
 		cfg *rest.Config

@@ -12,7 +12,8 @@ type EdgeProxyOptions struct {
 	DiskCachePath       string // 磁盘缓存路径
 	Version             bool
 	EnableSampleHandler bool
-	UseKubeConfig       bool
+	// UseKubeConfig for local minikube cluster test
+	UseKubeConfig bool
 }
 
 // NewEdgeProxyOptions creates a new EdgeProxyOptions with a default config.
