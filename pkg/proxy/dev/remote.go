@@ -1,12 +1,15 @@
 package dev
 
 import (
-	"code.aliyun.com/openyurt/edge-proxy/pkg/util"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+
+	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/serializer"
+
+	"code.aliyun.com/openyurt/edge-proxy/pkg/util"
 
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
@@ -26,21 +29,19 @@ type RemoteProxy struct {
 	stopCh <-chan struct{}
 	// checker health checker
 	checker *checker
+	// serializerManager for apiserver resp.Body encode and decode
+	serializerManager *serializer.SerializerManager
 }
 
 // NewRemoteProxy create a remote proxy
-func NewRemoteProxy(
-	remoteServer *url.URL,
-	cacheMgr *CacheMgr,
-	transport http.RoundTripper,
-	stopCh <-chan struct{},
-) (*RemoteProxy, error) {
+func NewRemoteProxy(remoteServer *url.URL, cacheMgr *CacheMgr, transport http.RoundTripper, sm *serializer.SerializerManager, stopCh <-chan struct{}) (*RemoteProxy, error) {
 
 	rproxy := &RemoteProxy{
-		remoteServer:     remoteServer,
-		currentTransport: transport,
-		cacheMgr:         cacheMgr,
-		stopCh:           stopCh,
+		remoteServer:      remoteServer,
+		currentTransport:  transport,
+		cacheMgr:          cacheMgr,
+		serializerManager: sm,
+		stopCh:            stopCh,
 	}
 
 	rproxy.checker = NewChecker(remoteServer)
@@ -49,12 +50,24 @@ func NewRemoteProxy(
 	// init reverse proxy for remoteServer
 	rproxy.reverseProxy = httputil.NewSingleHostReverseProxy(rproxy.remoteServer)
 
+	originalDirector := rproxy.reverseProxy.Director
+	rproxy.reverseProxy.Director = func(req *http.Request) {
+		originalDirector(req)
+		rproxy.modifyRequest(req)
+	}
 	rproxy.reverseProxy.Transport = rproxy // inject transport
 	rproxy.reverseProxy.FlushInterval = -1
 	rproxy.reverseProxy.ModifyResponse = rproxy.modifyResponse
 	rproxy.reverseProxy.ErrorHandler = rproxy.errorHandler
 
 	return rproxy, nil
+}
+
+//modifyRequest set accept header value receive protobuf resp
+func (rp *RemoteProxy) modifyRequest(req *http.Request) {
+	//value := req.Header.Get("Accept")
+	//klog.Infof("accept header is %v", value)
+	req.Header.Set("Accept", RespContentType)
 }
 
 func (rp *RemoteProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -105,6 +118,8 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 
 	labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
 
+	//contentType := resp.Header.Get("Content-Type")
+	//klog.Infof("contentType is %v", contentType)
 	// re-added transfer-encoding=chunked response header for watch request
 	info, exists := apirequest.RequestInfoFrom(ctx)
 	if exists {
@@ -125,7 +140,8 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 		if checkLabel(info, labelSelector, filterLabel) {
 			// done: 重写 gzip reader 因为里面有对 component 进行获取
 			wrapBody, needUncompressed := util.NewGZipReaderCloser(resp.Header, resp.Body, info, "filter")
-			size, filterRc, err := NewFilterReadCloser(wrapBody, info.Resource, "skip-")
+			serializerObject := CreateSerializer(info, rp.serializerManager)
+			size, filterRc, err := NewFilterReadCloser(wrapBody, info.Resource, "skip-", serializerObject)
 			if err != nil {
 				klog.Errorf("failed to filter response for %s, %v", util.ReqInfoString(info), err)
 				return err
@@ -160,7 +176,7 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 				wrapPrc, _ := util.NewGZipReaderCloser(resp.Header, prc, info, "cache-manager")
 				go func(req *http.Request, prc io.ReadCloser) {
 					klog.Infof("cache resourceusage response")
-					err := rp.cacheMgr.CacheResponseMemNew(info, prc, resourceType)
+					err := rp.cacheMgr.CacheResponseMem(info, prc, resourceType)
 					if err != nil {
 						klog.Errorf("%s response cache ended with error, %v", info.Resource, err)
 					}

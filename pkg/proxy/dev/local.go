@@ -70,7 +70,7 @@ func (lp *LocalProxy) localReqCache(w http.ResponseWriter, req *http.Request) er
 		return err
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", RespContentType)
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(obj)
 	if err != nil {

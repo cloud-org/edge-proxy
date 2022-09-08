@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	json "github.com/json-iterator/go"
+	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/serializer"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -34,7 +34,7 @@ func (s *skipListFilterReadCloser) Close() error {
 // rc: list filter apiserver resp io.ReadCloser(resp.Body)
 // resource: maybe configmaps/pods
 // prefix: it should be "skip-" in order to pass filter benchmark
-func NewFilterReadCloser(rc io.ReadCloser, resource string, prefix string) (int, io.ReadCloser, error) {
+func NewFilterReadCloser(rc io.ReadCloser, resource string, prefix string, serializerObject *serializer.Serializer) (int, io.ReadCloser, error) {
 	sfrc := &skipListFilterReadCloser{
 		data: new(bytes.Buffer),
 		rc:   rc,
@@ -42,11 +42,20 @@ func NewFilterReadCloser(rc io.ReadCloser, resource string, prefix string) (int,
 
 	switch resource {
 	case "pods":
-		var podList v1.PodList
-		err := json.NewDecoder(rc).Decode(&podList)
+		data, err := io.ReadAll(rc)
+		if err != nil {
+			klog.Errorf("readAll err: %v", err)
+			return 0, nil, err
+		}
+		obj, err := serializerObject.Decode(data)
 		if err != nil {
 			klog.Errorf("%s decode err: %v", resource, err)
 			return 0, nil, err
+		}
+		podList, ok := obj.(*v1.PodList)
+		if !ok {
+			klog.Errorf("*v1.PodList 断言失败")
+			return 0, nil, nil
 		}
 		var items []v1.Pod
 		for i := 0; i < len(podList.Items); i++ {
@@ -56,31 +65,40 @@ func NewFilterReadCloser(rc io.ReadCloser, resource string, prefix string) (int,
 			}
 		}
 		podList.Items = items
-		marshalBytes, err := json.Marshal(podList)
+		marshalBytes, err := serializerObject.Encode(podList)
 		if err != nil {
-			klog.Errorf("%s marshal err: %v", resource, err)
+			klog.Errorf("encode err: %v", err)
 			return 0, nil, err
 		}
 		sfrc.data = bytes.NewBuffer(marshalBytes)
 		return len(marshalBytes), sfrc, nil
 	case "configmaps":
-		var configmaps v1.ConfigMapList
-		err := json.NewDecoder(rc).Decode(&configmaps)
+		data, err := io.ReadAll(rc)
+		if err != nil {
+			klog.Errorf("readAll err: %v", err)
+			return 0, nil, err
+		}
+		obj, err := serializerObject.Decode(data)
 		if err != nil {
 			klog.Errorf("%s decode err: %v", resource, err)
 			return 0, nil, err
 		}
+		configmapList, ok := obj.(*v1.ConfigMapList)
+		if !ok {
+			klog.Errorf("*v1.ConfigMapList 断言失败")
+			return 0, nil, nil
+		}
 		var items []v1.ConfigMap
-		for i := 0; i < len(configmaps.Items); i++ {
+		for i := 0; i < len(configmapList.Items); i++ {
 			// if name doesn't include prefix, then append to the items
-			if !strings.HasPrefix(configmaps.Items[i].Name, prefix) {
-				items = append(items, configmaps.Items[i])
+			if !strings.HasPrefix(configmapList.Items[i].Name, prefix) {
+				items = append(items, configmapList.Items[i])
 			}
 		}
-		configmaps.Items = items
-		marshalBytes, err := json.Marshal(configmaps)
+		configmapList.Items = items
+		marshalBytes, err := serializerObject.Encode(configmapList)
 		if err != nil {
-			klog.Errorf("%s marshal err: %v", resource, err)
+			klog.Errorf("encode err: %v", err)
 			return 0, nil, err
 		}
 		sfrc.data = bytes.NewBuffer(marshalBytes)

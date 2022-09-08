@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 
+	"code.aliyun.com/openyurt/edge-proxy/pkg/kubernetes/serializer"
+
 	"code.aliyun.com/openyurt/edge-proxy/pkg/util"
 
 	"k8s.io/klog/v2"
@@ -33,6 +35,8 @@ type devFactory struct {
 	resourceCache bool
 	// resourceNs resource cache namespace
 	resourceNs string
+	// serializerManager for apiserver resp.Body encode and decode
+	serializerManager *serializer.SerializerManager
 }
 
 func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -52,7 +56,7 @@ func (d *devFactory) initCacheMgr() (*CacheMgr, error) {
 		klog.Errorf("could not create storage manager, %v", err)
 		return nil, err
 	}
-	cacheMgr := NewCacheMgr(storageManager)
+	cacheMgr := NewCacheMgr(storageManager, d.serializerManager)
 	return cacheMgr, nil
 }
 
@@ -68,6 +72,10 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 
 	remoteServer := cfg.RemoteServers[0] // 假设一定成立
 
+	// init serializer manager
+	serializerManager := serializer.NewSerializerManager()
+	d.serializerManager = serializerManager
+
 	cacheMgr, err := d.initCacheMgr()
 	if err != nil {
 		return nil, err
@@ -75,7 +83,7 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 
 	d.cacheMgr = cacheMgr
 	// init remoteProxy
-	lb, _ := NewRemoteProxy(remoteServer, cacheMgr, cfg.RT, stopCh)
+	lb, _ := NewRemoteProxy(remoteServer, cacheMgr, cfg.RT, d.serializerManager, stopCh)
 	d.remoteProxy = lb
 
 	// init localProxy
@@ -112,7 +120,7 @@ func (d *devFactory) returnCacheResourceUsage(handler http.Handler) http.Handler
 				goto end
 			}
 
-			rw.Header().Set("Content-Type", "application/json")
+			rw.Header().Set("Content-Type", RespContentType)
 			rw.WriteHeader(http.StatusOK)
 			_, err := rw.Write(res)
 			if err != nil {
