@@ -5,6 +5,7 @@
 - [edge-proxy](#edge-proxy)
   - [arch design](#arch-design)
   - [notice](#notice)
+  - [tree](#tree)
   - [build binary](#build-binary)
   - [local test use minikube not in cluster(use kubeconfig)](#local-test-use-minikube-not-in-clusteruse-kubeconfig)
   - [docker build and push](#docker-build-and-push)
@@ -27,6 +28,39 @@
 > 该分支为 master，性能测试方面使用了 `resourceLabel` 进行特殊判断, 通用 labelSelector list cachemgr 请参考 `labelSelector-cachemgr` 分支
 
 经过测试,大赛 benchmark 使用的是一个协程进行压测，所以关于 map 的使用为了提高性能没有考虑读写并发安全的问题，并发安全的分支可参考 `11-fix-solve-concurrent-coroutine-request-problem` 分支
+
+### tree
+
+- `pkg/kubernetes`
+
+```
+├── config        // use kubeconfig for benchmark local test
+├── health        // for apiserver health check livez
+└── types         // define struct for apiserver list result
+```
+
+- `pkg/proxy/dev`
+
+```
+├── cachemgr.go         // cache apiserver list result
+├── cachemgr_test.go    // unit test
+├── checker.go          // remote server health check
+├── common.go           // const define
+├── filter.go           // for filter benchmark
+├── handler.go          // edge-proxy handler
+├── infra.go            // apiserver interface define
+├── local.go            // local proxy for consistency benchmark
+└── remote.go           // remote proxy
+```
+
+- `pkg/benchmark`
+
+```
+├── benchmark-consistency.go
+├── benchmark-filter.go
+├── benchmark-functional.go
+├── benchmark-resourceusage.go // use pprof and timer for benchmark
+```
 
 ### build binary
 
