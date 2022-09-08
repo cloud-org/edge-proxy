@@ -12,6 +12,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// CheckClusterIsHealthyByGet check apiserver is healthy or not use http client skip verify
 func CheckClusterIsHealthyByGet(url string) bool {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -45,6 +46,7 @@ func CheckClusterIsHealthyByGet(url string) bool {
 	return true
 }
 
+// CheckClusterIsHealthy check apiserver is healthy or not use restclient
 func CheckClusterIsHealthy(client *kubernetes.Clientset) bool {
 
 	path := "/livez"

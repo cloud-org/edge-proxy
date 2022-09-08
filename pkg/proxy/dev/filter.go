@@ -12,12 +12,15 @@ import (
 	"k8s.io/klog/v2"
 )
 
+//skipListFilterReadCloser for filter benchmark
+// data: real return data
+// rc: list filter apiserver resp io.ReadCloser
 type skipListFilterReadCloser struct {
 	data *bytes.Buffer
 	rc   io.ReadCloser
 }
 
-// Read only for list
+// Read read data from s.data to p
 func (s *skipListFilterReadCloser) Read(p []byte) (int, error) {
 	return s.data.Read(p)
 }
@@ -28,6 +31,9 @@ func (s *skipListFilterReadCloser) Close() error {
 }
 
 // NewFilterReadCloser filter prefix for rc
+// rc: list filter apiserver resp io.ReadCloser(resp.Body)
+// resource: maybe configmaps/pods
+// prefix: it should be "skip-" in order to pass filter benchmark
 func NewFilterReadCloser(rc io.ReadCloser, resource string, prefix string) (int, io.ReadCloser, error) {
 	sfrc := &skipListFilterReadCloser{
 		data: new(bytes.Buffer),
@@ -44,6 +50,7 @@ func NewFilterReadCloser(rc io.ReadCloser, resource string, prefix string) (int,
 		}
 		var items []v1.Pod
 		for i := 0; i < len(podList.Items); i++ {
+			// if name doesn't include prefix, then append to the items
 			if !strings.HasPrefix(podList.Items[i].Name, prefix) {
 				items = append(items, podList.Items[i])
 			}
@@ -65,6 +72,7 @@ func NewFilterReadCloser(rc io.ReadCloser, resource string, prefix string) (int,
 		}
 		var items []v1.ConfigMap
 		for i := 0; i < len(configmaps.Items); i++ {
+			// if name doesn't include prefix, then append to the items
 			if !strings.HasPrefix(configmaps.Items[i].Name, prefix) {
 				items = append(items, configmaps.Items[i])
 			}
