@@ -12,11 +12,15 @@ import (
 // checker for check remote server health or not
 type checker struct {
 	sync.RWMutex
-	remoteServer   *url.URL
+	// remoteServer kube-apiserver url
+	remoteServer *url.URL
+	// clusterHealthy remote server health or not
 	clusterHealthy bool
-	lastTime       time.Time
+	// lastTime last health status update time
+	lastTime time.Time
 }
 
+// NewChecker create a checker with remoteServer
 func NewChecker(remoteServer *url.URL) *checker {
 	return &checker{
 		remoteServer: remoteServer,
@@ -24,11 +28,13 @@ func NewChecker(remoteServer *url.URL) *checker {
 	}
 }
 
+// start start health checker
 func (c *checker) start(stopCh <-chan struct{}) {
 	c.check() // check once when start
 	go c.loop(stopCh)
 }
 
+// loop for health check loop
 func (c *checker) loop(stopCh <-chan struct{}) {
 	checkDuration := 10 * time.Second
 	timer := time.NewTimer(checkDuration)
@@ -46,6 +52,7 @@ func (c *checker) loop(stopCh <-chan struct{}) {
 	}
 }
 
+// check check remote server is healthy or not
 func (c *checker) check() {
 	if !health.CheckClusterIsHealthyByGet(c.remoteServer.String()) {
 		c.markAsUnhealthy()
@@ -55,12 +62,14 @@ func (c *checker) check() {
 	c.markAsHealthy()
 }
 
+// markAsHealthy mark a remote server healthy
 func (c *checker) markAsHealthy() {
 	c.setHealthy(true)
 	now := time.Now()
 	c.lastTime = now
 }
 
+// markAsUnhealthy mark a remote server unhealthy
 func (c *checker) markAsUnhealthy() {
 	if c.isHealthy() {
 		c.setHealthy(false)
@@ -75,12 +84,14 @@ func (c *checker) markAsUnhealthy() {
 	}
 }
 
+// isHealthy get remote server's health status
 func (c *checker) isHealthy() bool {
 	c.RLock()
 	defer c.RUnlock()
 	return c.clusterHealthy
 }
 
+// setHealthy set a remote server's health status
 func (c *checker) setHealthy(healthy bool) {
 	c.Lock()
 	defer c.Unlock()

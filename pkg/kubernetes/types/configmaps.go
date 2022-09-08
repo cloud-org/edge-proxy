@@ -1,5 +1,6 @@
 package types
 
+//ConfigMapList like v1.ConfigMapList compress some fields
 type ConfigMapList struct {
 	Kind       string `json:"kind"`
 	APIVersion string `json:"apiVersion"`
@@ -13,7 +14,7 @@ type Metadata struct {
 	//UID               string          `json:"uid"`
 	//ResourceVersion   string          `json:"resourceVersion"`
 	//CreationTimestamp time.Time       `json:"creationTimestamp"`
-	Labels map[string]string `json:"labels"`
+	//Labels map[string]string `json:"labels"`
 	//ManagedFields     []ManagedFields `json:"managedFields"`
 }
 

@@ -33,9 +33,7 @@ func (lp *LocalProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	if reqInfo, ok := apirequest.RequestInfoFrom(ctx); ok && reqInfo != nil && reqInfo.IsResourceRequest {
 		switch reqInfo.Verb {
-		//case "delete", "deletecollection":
-		//	err = localDelete(w, req)
-		default: // list., get, update
+		default: // list, get, update
 			err = lp.localReqCache(w, req)
 		}
 

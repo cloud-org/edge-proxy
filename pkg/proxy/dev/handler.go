@@ -20,13 +20,19 @@ func init() {
 }
 
 type devFactory struct {
-	resolver      apirequest.RequestInfoResolver
-	remoteProxy   APIServerProxy
-	localProxy    APIServerProxy
-	cfg           *config.EdgeProxyConfiguration
-	cacheMgr      *CacheMgr
+	// for inject request info to http.Request
+	resolver apirequest.RequestInfoResolver
+	// remoteProxy reverseProxy for remote server
+	remoteProxy APIServerProxy
+	// localProxy use local proxy when remote server unhealthy
+	localProxy APIServerProxy
+	cfg        *config.EdgeProxyConfiguration
+	// cacheMgr cache manager
+	cacheMgr *CacheMgr
+	// resourceCache if resource has cached or not
 	resourceCache bool
-	resourceNs    string
+	// resourceNs resource cache namespace
+	resourceNs string
 }
 
 func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -35,7 +41,7 @@ func (d *devFactory) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// if lb not healthy, then use localProxy
+	// if remoteProxy not healthy, then use localProxy
 	d.localProxy.ServeHTTP(rw, req)
 }
 
@@ -68,25 +74,19 @@ func (d *devFactory) Init(cfg *config.EdgeProxyConfiguration, stopCh <-chan stru
 	}
 
 	d.cacheMgr = cacheMgr
+	// init remoteProxy
 	lb, _ := NewRemoteProxy(remoteServer, cacheMgr, cfg.RT, stopCh)
 	d.remoteProxy = lb
 
-	// local proxy when lb is not healthy
+	// init localProxy
 	d.localProxy = NewLocalProxy(cacheMgr, lb.IsHealthy)
 
 	return d.buildHandlerChain(d), nil
 }
 
-// buildHandlerChain use middleware
+// buildHandlerChain use middleware for handler
 func (d *devFactory) buildHandlerChain(handler http.Handler) http.Handler {
-	//handler = yurthubutil.WithRequestContentType(handler)
-	//handler = d.printCreateReqBody(handler)
 	handler = d.returnCacheResourceUsage(handler)
-	//handler = d.countReq(handler)
-	//handler = d.WithMaxInFlightLimit(handler, 200) // 两百个并发
-
-	// inject request info
-	//handler = filters.WithRequestInfo(handler, d.resolver)
 
 	return handler
 }

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strings"
 
 	"code.aliyun.com/openyurt/edge-proxy/pkg/util"
 
@@ -14,16 +13,23 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// RemoteProxy reverse proxy for remote kube-apiserver
 type RemoteProxy struct {
-	remoteServer     *url.URL
-	reverseProxy     *httputil.ReverseProxy
+	// remoteServer kube-apiserver url
+	remoteServer *url.URL
+	// reverseProxy reverse proxy for remoteServer
+	reverseProxy *httputil.ReverseProxy
+	// currentTransport rest.TransportFor(cfg)
 	currentTransport http.RoundTripper
-	cacheMgr         *CacheMgr
-	stopCh           <-chan struct{}
-	checker          *checker
+	// cacheMgr cache manager
+	cacheMgr *CacheMgr
+	// stopCh stop channel
+	stopCh <-chan struct{}
+	// checker health checker
+	checker *checker
 }
 
-// NewRemoteProxy 参数之后接着补充
+// NewRemoteProxy create a remote proxy
 func NewRemoteProxy(
 	remoteServer *url.URL,
 	cacheMgr *CacheMgr,
@@ -41,10 +47,10 @@ func NewRemoteProxy(
 	rproxy.checker = NewChecker(remoteServer)
 	rproxy.checker.start(rproxy.stopCh) // start checker
 
-	// 初始化反向代理
+	// init reverse proxy for remoteServer
 	rproxy.reverseProxy = httputil.NewSingleHostReverseProxy(rproxy.remoteServer)
 
-	rproxy.reverseProxy.Transport = rproxy // 注入自定义的 transport
+	rproxy.reverseProxy.Transport = rproxy // inject transport
 	rproxy.reverseProxy.FlushInterval = -1
 	rproxy.reverseProxy.ModifyResponse = rproxy.modifyResponse
 	rproxy.reverseProxy.ErrorHandler = rproxy.errorHandler
@@ -75,8 +81,16 @@ func (rp *RemoteProxy) IsHealthy() bool {
 	return rp.checker.isHealthy()
 }
 
+// modifyResponse modify response from kube-apiserver
+// it's important in this function
+// if request is not HTTP GET method, then return directly, because we only need to modify resp with HTTP GET method
+// for benchmark type is func, we should re-add Transfer-Encoding header to resp if verb is watch
+// for benchmark type is filter, we should filter resp if the item name include prefix "skip-"
+// for benchmark type is consistency, we should cache list result and then filter item which label include type=consistency
+// for benchmark type is resourceusage, we can cache list result to memory, and on the next time if labelSelector with
+// resourceusage can query, then we can return it directly.
 func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
-	// 过滤和设置缓存
+	// no resp or no request
 	if resp == nil || resp.Request == nil {
 		klog.Infof("no request info in response, skip cache response")
 		return nil
@@ -105,7 +119,7 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 		}
 	}
 
-	// 成功响应
+	// success statusCode and is list request
 	if resp.StatusCode >= http.StatusOK && resp.StatusCode <= http.StatusPartialContent && info.Verb == "list" {
 		//klog.Infof("request info is %+v\n", info)
 		// filter response data
@@ -120,6 +134,7 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 			resp.Body = filterRc
 			if size > 0 {
 				resp.ContentLength = int64(size)
+				// re-set Content-Length
 				resp.Header.Set("Content-Length", fmt.Sprint(size))
 			}
 
@@ -133,6 +148,7 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 			return nil
 		}
 
+		// funcational benchmark not need to cache
 		if checkLabel(info, labelSelector, funcLabel) {
 			klog.Infof("functional label not need to cache")
 			return nil
@@ -182,14 +198,4 @@ func (rp *RemoteProxy) modifyResponse(resp *http.Response) error {
 	}
 
 	return nil
-}
-
-func checkLabel(info *apirequest.RequestInfo, selector string, label string) bool {
-	if info.IsResourceRequest && info.Verb == "list" &&
-		(info.Resource == "pods" || info.Resource == "configmaps") &&
-		strings.Contains(selector, label) { // only for consistency
-		return true
-	}
-
-	return false
 }

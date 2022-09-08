@@ -15,11 +15,15 @@ import (
 	"k8s.io/klog/v2"
 )
 
+//CacheMgr cache for list resp.Body
 type CacheMgr struct {
-	storage storage.Store     // disk cache manager for consistency list
-	memdata map[string][]byte // mem cache for resourceusage list
+	//storage disk cache manager for consistency list
+	storage storage.Store
+	//memdata memory cache for list labelSelector result
+	memdata map[string][]byte
 }
 
+// NewCacheMgr create a cachemgr
 func NewCacheMgr(s storage.Store) *CacheMgr {
 	return &CacheMgr{
 		storage: s,
@@ -27,27 +31,10 @@ func NewCacheMgr(s storage.Store) *CacheMgr {
 	}
 }
 
-// ReadAll tag: v0.0.26 有打包使用 score: 130241.5284
-func ReadAll(r io.Reader) ([]byte, error) {
-	//b := make([]byte, 0, 532874) // local minikube data.len
-	b := make([]byte, 0, 1133672) // data.len: 1133657 线上测评数据
-
-	for {
-		if len(b) == cap(b) {
-			// Add more capacity (let append pick how much).
-			b = append(b, 0)[:len(b)]
-		}
-		n, err := r.Read(b[len(b):cap(b)])
-		b = b[:len(b)+n]
-		if err != nil {
-			if err == io.EOF {
-				err = nil
-			}
-			return b, err
-		}
-	}
-}
-
+//CacheResponseMemNew handle pod and configmaps mem cache
+// info: req inject requestInfo
+// prc: is a readCloser
+// labelType: filter resource label type or generate unique key for cache
 func (c *CacheMgr) CacheResponseMemNew(info *apirequest.RequestInfo, prc io.ReadCloser, labelType string) error {
 
 	var configmaps types.ConfigMapList
@@ -77,15 +64,15 @@ func (c *CacheMgr) CacheResponseMemNew(info *apirequest.RequestInfo, prc io.Read
 	return nil
 }
 
-//CacheResponseMem cache resourceusage list data
+// Deprecated: CacheResponseMem cache resourceusage list data
 func (c *CacheMgr) CacheResponseMem(info *apirequest.RequestInfo, prc io.ReadCloser, labelType string) error {
 	key := KeyFunc(info.Resource, info.Namespace, labelType)
 
 	//p := new(bytes.Buffer)
 	//p := bytes.NewBuffer(make([]byte, 0, 100*1024)) // data.len: 1123875 线上测评数据
 	//_, err := p.ReadFrom(prc)
-	//data, err := io.ReadAll(prc)
-	data, err := ReadAll(prc)
+	data, err := io.ReadAll(prc)
+	//data, err := ReadAll(prc)
 	if err != nil {
 		klog.Errorf("read prc err: %v", err)
 		return err
@@ -111,6 +98,7 @@ func (c *CacheMgr) CacheResponse(info *apirequest.RequestInfo, prc io.ReadCloser
 		}
 		var items []v1.Pod
 		for i := 0; i < len(podList.Items); i++ {
+			// filter label type
 			if podList.Items[i].Labels["type"] == labelType {
 				//klog.Infof("add item %s", podList.Items[i].Name)
 				items = append(items, podList.Items[i])
@@ -137,6 +125,7 @@ func (c *CacheMgr) CacheResponse(info *apirequest.RequestInfo, prc io.ReadCloser
 		}
 		var items []v1.ConfigMap
 		for i := 0; i < len(configmaps.Items); i++ {
+			// filter label type
 			if configmaps.Items[i].Labels["type"] == labelType {
 				//klog.Infof("add item %s", configmaps.Items[i].Name)
 				items = append(items, configmaps.Items[i])
@@ -174,7 +163,7 @@ func (c *CacheMgr) QueryCacheMem(resource, ns, labelType string) ([]byte, bool) 
 	return data, ok
 }
 
-// KeyFunc combine comp resource ns name into a key
+// KeyFunc generate a key for cache manager
 func KeyFunc(resource, ns, labelType string) string {
 	comp := "bench"
 	return filepath.Join(comp, resource, ns, labelType)

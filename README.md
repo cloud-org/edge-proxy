@@ -12,7 +12,6 @@
   - [docker-build and gen manifest yaml file](#docker-build-and-gen-manifest-yaml-file)
   - [deploy benchmark pod](#deploy-benchmark-pod)
   - [retest](#retest)
-  - [Coding Time](#coding-time)
   - [acknowledgement](#acknowledgement)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -24,6 +23,8 @@
 ![](./img/arch.png)
 
 ### notice
+
+> 该分支为 master，性能测试方面使用了 `resourceLabel` 进行特殊判断, 通用 labelSelector list cachemgr 请参考 `labelSelector-cachemgr` 分支
 
 经过测试,大赛 benchmark 使用的是一个协程进行压测，所以关于 map 的使用为了提高性能没有考虑读写并发安全的问题，并发安全的分支可参考 `11-fix-solve-concurrent-coroutine-request-problem` 分支
 
@@ -109,11 +110,6 @@ kubectl delete -f _output/manifest.yaml
 ```
 kubectl apply -f _output/manifest.yaml
 ```
-
-### Coding Time
-
-![wakatime](https://wakatime.com/badge/user/01c864c3-99e2-47a2-ad28-cc0f36b02f39/project/8ae39e6c-e2ff-45a3-acbf-e5deee6bdfa8.svg)
-
 
 ### acknowledgement
 
