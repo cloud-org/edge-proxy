@@ -95,5 +95,10 @@ func prepareRoundTripper(usekubeconfig bool) (http.RoundTripper, error) {
 		return nil, err
 	}
 
+	//  modify content-type 貌似没啥用
+	//cfg.AcceptContentTypes = "application/vnd.kubernetes.protobuf"
+	//cfg.ContentType = "application/vnd.kubernetes.protobuf"
+	//klog.Infof("cfg content-type %v, %v", cfg.AcceptContentTypes, cfg.ContentType)
+
 	return rest.TransportFor(cfg)
 }
