@@ -25,9 +25,14 @@
 
 ### notice
 
-> 该分支为 master，性能测试方面使用了 `resourceLabel` 进行特殊判断, 通用 labelSelector list cachemgr 请参考 `labelSelector-cachemgr` 分支
+仓库共包含 5 个分支，对应 5 个不同的解决方案
 
-经过测试,大赛 benchmark 使用的是一个协程进行压测，所以关于 map 的使用为了提高性能没有考虑读写并发安全的问题，并发安全的分支可参考 `11-fix-solve-concurrent-coroutine-request-problem` 分支
+- master：目前排行榜上的代码，对 labelSelector 进行判断以及对响应体裁剪
+- labelSelector-cachemgr：通用的 labelSelector cachemgr，由于主办方说不建议使用
+- resourceusage label 进行判断，所以使用了通用的 labelSelector cachemgr
+- origintype：响应体未压缩的代码，资源分 5w+
+- protobuf：使用 protobuf 协议的代码，接收 protobuf 格式响应体
+- 11-fix-solve-concurrent-coroutine-request-problem：由于大赛测评程序使用了一个协程进行压测，其他分支的 map 没有考虑并发读写安全以及缓存击穿的问题，这个分支做了对应的修改适配
 
 ### tree
 
