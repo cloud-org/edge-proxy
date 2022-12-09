@@ -1,0 +1,554 @@
+Index: README.md
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/README.md b/README.md
+--- a/README.md	(revision 77c9fbbeafc1d99c000613f63c4d1db3ba8c36ec)
++++ b/README.md	(revision f159ace521cbde4ec34e4970b0bea73b2d668f43)
+@@ -2,110 +2,98 @@
+ <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+ **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+ 
+-- [edge-proxy本地开发](#edge-proxy%E6%9C%AC%E5%9C%B0%E5%BC%80%E5%8F%91)
+-  - [运行环境](#%E8%BF%90%E8%A1%8C%E7%8E%AF%E5%A2%83)
+-  - [构建二进制](#%E6%9E%84%E5%BB%BA%E4%BA%8C%E8%BF%9B%E5%88%B6)
+-  - [local test use minikube not in cluster(use kubeconfig)](#local-test-use-minikube-not-in-clusteruse-kubeconfig)
+-  - [docker build and push](#docker-build-and-push)
+-  - [如何本地测试](#%E5%A6%82%E4%BD%95%E6%9C%AC%E5%9C%B0%E6%B5%8B%E8%AF%95)
+-    - [构建docker镜像，生成测试用的 manifest 文件](#%E6%9E%84%E5%BB%BAdocker%E9%95%9C%E5%83%8F%E7%94%9F%E6%88%90%E6%B5%8B%E8%AF%95%E7%94%A8%E7%9A%84-manifest-%E6%96%87%E4%BB%B6)
+-    - [创建 manifest 资源](#%E5%88%9B%E5%BB%BA-manifest-%E8%B5%84%E6%BA%90)
+-    - [重复测试流程](#%E9%87%8D%E5%A4%8D%E6%B5%8B%E8%AF%95%E6%B5%81%E7%A8%8B)
+-  - [Coding Time](#coding-time)
++- [edge-proxy](#edge-proxy)
+ 
+ <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+ 
+-# edge-proxy本地开发
+-
+-## 运行环境
+-
+-linux 运行环境
+-
+-## 构建二进制
+-
+-```
+-# make build
+-```
+-
+-make build 命令会生成两个二进制:edge-proxy 和 benchmark, 存放在目录：_output/local/bin/{GOOS}/{GOARCH}/
+-
+-* edge-proxy 是本次比赛的框架代码，选手可以根据里面的主体逻辑实现对应的功能。
+-* benchmark 是提供的一个用于本地调试 edge-proxy 功能的工具，选手也参照 benchmark 提供的代码，对 edge-proxy 更详细的测试。
+-
+-## local test use minikube not in cluster(use kubeconfig)
+-
+-```sh
+-export server_addr=$(kubectl config view --minify -o=jsonpath="{.clusters[*].cluster.server}")
+-export ns=$(kubectl get cm kube-root-ca.crt -o=jsonpath="{.metadata.namespace}")
+-./edge-proxy --server-addr ${server_addr} --use-kubeconfig true --enable-sample-handler true --disk-cache-path ~/.kube/cloudnative-challenge/cache
+-./benchmark --namespace ${ns} --use-kubeconfig
+-```
+-
+-## docker build and push
+-
+-````sh
+-make docker-build IMAGE_REPO=registry.cn-shanghai.aliyuncs.com/cloud-native-edge-proxy IMAGE_TAG=v0.0.1 REGION=cn
+-````
+-
+-## 如何本地测试
+-
+-```sh
+-alias kubectl='kubectl --kubeconfig ~/.kube/cloudnative-challenge/config'
+-```
+-
+-### 构建docker镜像，生成测试用的 manifest 文件
+-
+-`make docker-build` 命令用于生成并push edge-proxy镜像 和并且产生用于本地测试的manifest 文件
+-
+-参数解析：
+-
+-* IMAGE_REPO指定镜像 repo
+-* IMAGE_TAG指定镜像 tag
+-* REGION指定是否需要代理
+-* DOCKER_USERNAME 指定阿里云镜像仓库的用户名
+-* DOCKER_PASSWD 指定阿里云镜像仓库的密码
+-
+-// 比如: 生成镜像registry.cn-shanghai.aliyuncs.com/cloudnative-challenge/edge-proxy:v1.0，并且使用golang代理， 命令如下:
+-
+-```
+-$ make docker-build IMAGE_REPO=registry.cn-shanghai.aliyuncs.com/cloudnative-challenge IMAGE_TAG=v1.0 REGION=cn DOCKER_USERNAME=** DOCKER_PASSWD=**
+-```
+-
+-若 `make docker-build` 命令执行成功， 会自动push 镜像到对应的阿里云镜像仓库中，并且在`_output/` 目录下生成 `manifest.yaml` 文件。
+-`manifest.yaml` 文件里主要包括了测试的pod资源对象。
+-
+-### 创建 manifest 资源
+-
+-`kubectl apply -f _output/manifest.yaml`
+-
+-执行后， 会在对应命名空间下生成名字为benchmark 的pod对象，此pod包含了两个容器， 一个是edge-proxy 的容器， 一个是benchmark 的容器， 可以使用kubectl命令查看:
++### edge-proxy
+ 
+-`kubectl get pod benchmark -o yaml`
++return resourceusage cache 并发安全分支，解决了类似多协程并发请求存在缓存击穿问题。
+ 
+-```
+-#查看 bench-mark 容器日志: 
+-kubectl logs -f benchmark bench-mark
++- 关键函数
+ 
+-# 查看 edge-proxy 容器日志:
+-kubectl logs -f benchmark edge-proxy
+-```
++```go
++//returnCacheResourceUsage if labelSelector contains type=resourceusage, then return mem data if ok
++func (d *devFactory) returnCacheResourceUsage(handler http.Handler) http.Handler {
++	var count int32
++	//var countLock sync.Mutex
++	var resourceLock sync.Mutex
+ 
+-### 重复测试流程
++	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
++		// if resource usage cache, then return, else continue
++		labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
++		defer func() {
++			label := labelSelector
++			if strings.Contains(label, resourceLabel) {
++				atomic.AddInt32(&count, 1)
++				klog.V(5).Infof("latest count %v", atomic.LoadInt32(&count))
++			}
++		}()
++		if d.getResourceCache() && strings.Contains(labelSelector, resourceLabel) {
++			//klog.Infof("return resource cache")
++			klog.V(5).Infof("enter get resource cache")
++			res, ok := d.cacheMgr.QueryCacheMem("configmaps", d.resourceNs, resourceType)
++			if !ok {
++				klog.Errorf("may be not resource cache")
++				goto end
++			}
+ 
+-1. 修改 edge-proxy 代码逻辑
+-2. 执行 `make docker-build` 命令， 重新构建镜像，并 push 镜像
+-3. 删掉测试pod
++			rw.Header().Set("Content-Type", "application/json")
++			_, err := rw.Write(res)
++			if err != nil {
++				klog.Errorf("rw.Write err: %v", err)
++				goto end
++			}
++			//rw.WriteHeader(http.StatusOK)
++			// return if not err
++			return
++		}
++	end:
+ 
+-```
+-kubectl delete -f _output/manifest.yaml
+-```
++		info, err := d.resolver.NewRequestInfo(req)
++		if err != nil {
++			klog.Errorf("resolver request info err: %v", err)
++			return
++		}
++		// inject info
++		req = req.WithContext(apirequest.WithRequestInfo(req.Context(), info))
++		// 全局阻塞
++		if checkLabel(info, labelSelector, resourceLabel) {
++			resourceLock.Lock()
++			defer resourceLock.Unlock()
++			// 重新检测 resource cache
++			if d.getResourceCache() {
++				klog.V(5).Infof("enter after lock check")
++			retry:
++				res, ok := d.cacheMgr.QueryCacheMem("configmaps", d.resourceNs, resourceType)
++				if !ok {
++					klog.Errorf("may be not resource cache")
++					time.Sleep(10 * time.Millisecond)
++					goto retry
++				}
+ 
+-4. 重新创建测试 pod
++				rw.Header().Set("Content-Type", "application/json")
++				_, err = rw.Write(res)
++				if err != nil {
++					klog.Errorf("rw.Write err: %v", err)
++					rw.WriteHeader(http.StatusInternalServerError)
++					return
++				}
++				// 成功才写入 ok header
++				//rw.WriteHeader(http.StatusOK)
++				// return if not err
++				return
++			}
++			klog.Infof("enter first resource usage")
++			// no resource cache
++			handler.ServeHTTP(rw, req)
++			d.setResourceCache(info.Namespace)
++			return
++		}
++		// other request 其他请求
++		handler.ServeHTTP(rw, req)
++		return
++	})
++}
+ 
+-```
+-kubectl apply -f _output/manifest.yaml
+-```
+-
+-## Coding Time
+-
+-![wakatime](https://wakatime.com/badge/user/01c864c3-99e2-47a2-ad28-cc0f36b02f39/project/8ae39e6c-e2ff-45a3-acbf-e5deee6bdfa8.svg)
++```
+\ No newline at end of file
+Index: cmd/benchmark/app/options/options.go
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/cmd/benchmark/app/options/options.go b/cmd/benchmark/app/options/options.go
+--- a/cmd/benchmark/app/options/options.go	(revision 77c9fbbeafc1d99c000613f63c4d1db3ba8c36ec)
++++ b/cmd/benchmark/app/options/options.go	(revision f159ace521cbde4ec34e4970b0bea73b2d668f43)
+@@ -12,13 +12,15 @@
+ 	Namespace     string
+ 	UseKubeConfig bool
+ 	BenchType     string
++	BenchCount    int
+ }
+ 
+ // NewBenchmarkOptions creates a new BenchMarkOptions with a default config.
+ func NewBenchmarkOptions() *BenchMarkOptions {
+ 	o := &BenchMarkOptions{
+-		TimeOut:   60 * 30, // second
+-		BenchType: "all",
++		TimeOut:    60 * 30, // second
++		BenchType:  "all",
++		BenchCount: 1,
+ 	}
+ 	return o
+ }
+@@ -38,4 +40,5 @@
+ 	fs.StringVar(&o.Namespace, "namespace", o.Namespace, "bench mark namespace")
+ 	fs.StringVar(&o.BenchType, "bench", o.BenchType, "bench type(all|resource|func|filter|consistency)")
+ 	fs.BoolVar(&o.UseKubeConfig, "use-kubeconfig", o.UseKubeConfig, "use kubeconfig or not. 集群外测试使用")
++	fs.IntVar(&o.BenchCount, "count", o.BenchCount, "bench mark count for resourceusage")
+ }
+Index: pkg/benchmark/benchmark-resourceusage.go
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pkg/benchmark/benchmark-resourceusage.go b/pkg/benchmark/benchmark-resourceusage.go
+--- a/pkg/benchmark/benchmark-resourceusage.go	(revision 77c9fbbeafc1d99c000613f63c4d1db3ba8c36ec)
++++ b/pkg/benchmark/benchmark-resourceusage.go	(revision f159ace521cbde4ec34e4970b0bea73b2d668f43)
+@@ -4,6 +4,8 @@
+ 	"context"
+ 	"fmt"
+ 	"os/exec"
++	"sync"
++	"sync/atomic"
+ 	"time"
+ 
+ 	"code.aliyun.com/openyurt/edge-proxy/pkg/benchmark/util"
+@@ -22,6 +24,7 @@
+ 	NameSpace         string
+ 	Labels            map[string]string
+ 	Nums              int
++	Count             int
+ }
+ 
+ func (r *Resourceusage) Prepare(ctx context.Context) error {
+@@ -55,7 +58,99 @@
+ }
+ 
+ func (r *Resourceusage) BenchMark(ctx context.Context) error {
+-	return r.benchmark_configmap(ctx)
++	//return r.benchmark_configmap(ctx)
++	//return r.benchmark_configmap_count(ctx)
++	return r.benchmark_configmap_concurrent(ctx, r.Count) // 25 目前是这个数会高点
++}
++
++func (r *Resourceusage) invoke(ctx context.Context) error {
++	// list cms
++	cms, err := r.ProxyClient.CoreV1().ConfigMaps(r.NameSpace).List(
++		ctx, metav1.ListOptions{
++			LabelSelector: labels.SelectorFromSet(r.Labels).String(),
++		})
++	if err != nil {
++		return err
++	}
++	if len(r.PrepareConfigmaps) != len(cms.Items) {
++		klog.Errorf(
++			"Inconsistent data returned, prepare len %d get len %d",
++			len(r.PrepareConfigmaps),
++			len(cms.Items),
++		)
++		return fmt.Errorf("inconsistent data returned")
++	}
++
++	return nil
++}
++
++func (r *Resourceusage) benchmark_configmap_count(ctx context.Context) error {
++	wg := sync.WaitGroup{}
++	wg.Add(200)
++	for i := 0; i < 200; i++ {
++		go func() {
++			wg.Done()
++			if err := r.invoke(ctx); err != nil {
++				klog.Errorf("invoke err: %v", err)
++			}
++		}()
++	}
++
++	wg.Wait()
++
++	return nil
++}
++
++func (r *Resourceusage) benchmark_configmap_concurrent(ctx context.Context, num int) error {
++	go func() {
++		klog.Infof("prepare to start cpu profile")
++		_, err := exec.Command("wget", "http://127.0.0.1:10267/debug/pprof/profile?seconds=60", "-O", "profile.txt").CombinedOutput()
++		if err != nil {
++			klog.Errorf("cpu err: %v", err)
++			return
++		}
++		//klog.Infof("data is %v", data)
++		return
++	}()
++	defer func() {
++		klog.Infof("prepare to start heap profile")
++		_, err := exec.Command("wget", "http://127.0.0.1:10267/debug/pprof/heap", "-O", "heap.txt").CombinedOutput()
++		if err != nil {
++			klog.Errorf("heap err: %v", err)
++			return
++		}
++		//klog.Infof("data is %v", data)
++		return
++	}()
++
++	var count int32
++	wg := sync.WaitGroup{}
++	wg.Add(num)
++	for i := 0; i < num; i++ {
++		go func(index int) {
++			defer wg.Done()
++			timer := time.NewTimer(1 * time.Minute)
++			for {
++				select {
++				case <-timer.C:
++					klog.Infof("timer received %v", index)
++					return
++				default:
++					if err := r.invoke(ctx); err != nil {
++						klog.Errorf("invoke err: %v", err)
++					} else { // 成功
++						atomic.AddInt32(&count, 1)
++					}
++				}
++			}
++		}(i)
++	}
++
++	wg.Wait()
++
++	klog.Infof("count is %v, tps: %v/s", count, count/60)
++
++	return nil
+ }
+ 
+ func (r *Resourceusage) benchmark_configmap(ctx context.Context) error {
+@@ -129,12 +224,13 @@
+ 	return fmt.Sprintf("benchMark %s", r.Name())
+ }
+ 
+-func NewResourceusage(ns string, proxyClient, client kubernetes.Interface) *Resourceusage {
++func NewResourceusage(ns string, proxyClient, client kubernetes.Interface, count int) *Resourceusage {
+ 	return &Resourceusage{
+ 		ProxyClient: proxyClient,
+ 		Client:      client,
+ 		NameSpace:   ns,
+ 		Nums:        1000,
++		Count:       count,
+ 		Labels: map[string]string{
+ 			"type":                    "resourceusage",
+ 			util.BENCH_MARK_LABEL_KEY: util.BENCH_MARK_LABEL_VALUE,
+Index: pkg/benchmark/benchmark.go
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pkg/benchmark/benchmark.go b/pkg/benchmark/benchmark.go
+--- a/pkg/benchmark/benchmark.go	(revision 77c9fbbeafc1d99c000613f63c4d1db3ba8c36ec)
++++ b/pkg/benchmark/benchmark.go	(revision f159ace521cbde4ec34e4970b0bea73b2d668f43)
+@@ -5,7 +5,7 @@
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+ 
+-    http://www.apache.org/licenses/LICENSE-2.0
++	http://www.apache.org/licenses/LICENSE-2.0
+ 
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+@@ -135,7 +135,7 @@
+ 		b.SubBenchMarkers = append(b.SubBenchMarkers,
+ 			NewFunctional(b.Namespace, proxycs, cs, b.ProxyConfigMapLister, b.ConfigMapLister),
+ 			NewFilter(b.Namespace, proxycs, cs),
+-			NewResourceusage(b.Namespace, proxycs, cs),
++			NewResourceusage(b.Namespace, proxycs, cs, deps.BenchCount),
+ 			NewConsistency(b.Namespace, proxycs, cs),
+ 		)
+ 	case "filter":
+@@ -152,7 +152,7 @@
+ 		)
+ 	case "resource":
+ 		b.SubBenchMarkers = append(b.SubBenchMarkers,
+-			NewResourceusage(b.Namespace, proxycs, cs),
++			NewResourceusage(b.Namespace, proxycs, cs, deps.BenchCount),
+ 		)
+ 	}
+ 
+Index: pkg/proxy/dev/handler.go
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pkg/proxy/dev/handler.go b/pkg/proxy/dev/handler.go
+--- a/pkg/proxy/dev/handler.go	(revision 77c9fbbeafc1d99c000613f63c4d1db3ba8c36ec)
++++ b/pkg/proxy/dev/handler.go	(revision f159ace521cbde4ec34e4970b0bea73b2d668f43)
+@@ -3,6 +3,9 @@
+ import (
+ 	"net/http"
+ 	"strings"
++	"sync"
++	"sync/atomic"
++	"time"
+ 
+ 	"github.com/openyurtio/openyurt/pkg/yurthub/storage/factory"
+ 	"k8s.io/klog/v2"
+@@ -19,6 +22,7 @@
+ }
+ 
+ type devFactory struct {
++	sync.RWMutex
+ 	resolver      apirequest.RequestInfoResolver
+ 	loadBalancer  LoadBalancer
+ 	localProxy    LoadBalancer
+@@ -38,7 +42,7 @@
+ 	d.localProxy.ServeHTTP(rw, req)
+ }
+ 
+-//initCacheMgr init cache mgr
++// initCacheMgr init cache mgr
+ func (d *devFactory) initCacheMgr() (*CacheMgr, error) {
+ 	storageManager, err := factory.CreateStorage(d.cfg.DiskCachePath)
+ 	if err != nil {
+@@ -90,17 +94,38 @@
+ 	return handler
+ }
+ 
+-//returnCacheResourceUsage if labelSelector contains type=resourceusage, then return mem data if ok
++func (d *devFactory) getResourceCache() bool {
++	d.RLock()
++	defer d.RUnlock()
++	return d.resourceCache
++}
++
++func (d *devFactory) setResourceCache(ns string) {
++	d.Lock()
++	defer d.Unlock()
++	d.resourceCache = true
++	d.resourceNs = ns
++}
++
++// returnCacheResourceUsage if labelSelector contains type=resourceusage, then return mem data if ok
+ func (d *devFactory) returnCacheResourceUsage(handler http.Handler) http.Handler {
+-	var count int
++	var count int32
++	//var countLock sync.Mutex
++	var resourceLock sync.Mutex
+ 
+ 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+ 		// if resource usage cache, then return, else continue
+ 		labelSelector := req.URL.Query().Get("labelSelector") // filter then enter
+-		if d.resourceCache && strings.Contains(labelSelector, resourceLabel) {
++		defer func() {
++			label := labelSelector
++			if strings.Contains(label, resourceLabel) {
++				atomic.AddInt32(&count, 1)
++				klog.V(5).Infof("latest count %v", atomic.LoadInt32(&count))
++			}
++		}()
++		if d.getResourceCache() && strings.Contains(labelSelector, resourceLabel) {
+ 			//klog.Infof("return resource cache")
+-			count++
+-			klog.Infof("resource usage count is %v", count)
++			klog.V(5).Infof("enter get resource cache")
+ 			res, ok := d.cacheMgr.QueryCacheMem("configmaps", d.resourceNs, resourceType)
+ 			if !ok {
+ 				klog.Errorf("may be not resource cache")
+@@ -108,12 +133,12 @@
+ 			}
+ 
+ 			rw.Header().Set("Content-Type", "application/json")
+-			rw.WriteHeader(http.StatusOK)
+ 			_, err := rw.Write(res)
+ 			if err != nil {
+ 				klog.Errorf("rw.Write err: %v", err)
+ 				goto end
+ 			}
++			//rw.WriteHeader(http.StatusOK)
+ 			// return if not err
+ 			return
+ 		}
+@@ -126,13 +151,41 @@
+ 		}
+ 		// inject info
+ 		req = req.WithContext(apirequest.WithRequestInfo(req.Context(), info))
+-		// no resource cache
+-		handler.ServeHTTP(rw, req)
+-		if checkLabel(info, labelSelector, resourceLabel) {
+-			d.resourceCache = true        // set cache true
+-			d.resourceNs = info.Namespace // set ns
+-			count++
+-			klog.Infof("first resource usage count is %v", count)
++		// 全局阻塞
++		if checkLabel(info, labelSelector, resourceLabel) {
++			resourceLock.Lock()
++			defer resourceLock.Unlock()
++			// 重新检测 resource cache
++			if d.getResourceCache() {
++				klog.V(5).Infof("enter after lock check")
++			retry:
++				res, ok := d.cacheMgr.QueryCacheMem("configmaps", d.resourceNs, resourceType)
++				if !ok {
++					klog.Errorf("may be not resource cache")
++					time.Sleep(10 * time.Millisecond)
++					goto retry
++				}
++
++				rw.Header().Set("Content-Type", "application/json")
++				_, err = rw.Write(res)
++				if err != nil {
++					klog.Errorf("rw.Write err: %v", err)
++					rw.WriteHeader(http.StatusInternalServerError)
++					return
++				}
++				// 成功才写入 ok header
++				//rw.WriteHeader(http.StatusOK)
++				// return if not err
++				return
++			}
++			klog.Infof("enter first resource usage")
++			// no resource cache
++			handler.ServeHTTP(rw, req)
++			d.setResourceCache(info.Namespace)
++			return
+ 		}
++		// other request 其他请求
++		handler.ServeHTTP(rw, req)
++		return
+ 	})
+ }
