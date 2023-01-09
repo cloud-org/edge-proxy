@@ -28,7 +28,7 @@
 仓库共包含 5 个分支，对应 5 个不同的解决方案
 
 - master：目前排行榜上的代码，对 labelSelector 进行判断以及对响应体裁剪
-- labelSelector-cachemgr：通用的 labelSelector cachemgr，由于主办方说不建议使用
+- labelSelector-cachemgr：通用的 labelSelector cachemgr，由于主办方说不建议使用 resourceusage label 进行判断，所以实现通用的逻辑
 - resourceusage label 进行判断，所以使用了通用的 labelSelector cachemgr
 - origintype：响应体未压缩的代码，资源分 5w+
 - protobuf：使用 protobuf 协议的代码，接收 protobuf 格式响应体
